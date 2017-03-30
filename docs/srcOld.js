@@ -14,6 +14,7 @@ app.controller('AboutController', ['$scope', 'cache',
         $scope.data = {};//commment
         //多级变量申明
         var scopeData = $scope.data = {};
+        var scopeData2 = scopeData;
         //变量赋值
         scopeData = null;
         //单个变量申明
@@ -38,10 +39,10 @@ app.controller('AboutController', ['$scope', 'cache',
             objVar4(param1, param2){
                 param1 = mutiVar1;
                 param2 = $scope.data;
-                return objVar1;
+                return mutiVar2;
             },
             get value() {
-                return objVar2,objVar1, scopeData.data;
+                return mutiVar2,mutiVar1, scopeData.data;
             },
             set value(value) {
                 this.objVar1 = value

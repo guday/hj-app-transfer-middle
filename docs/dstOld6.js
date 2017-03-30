@@ -10,9 +10,10 @@
 app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
 
   //scope变量初始化
-  $scope.data = {}; //commment
+  this.data = {}; //commment
   //多级变量申明
-  var scopeData = $scope.data = {};
+  var scopeData = this.data = {};
+  var scopeData2 = this.scopeData;
   //变量赋值
   scopeData = null;
   //单个变量申明
@@ -24,23 +25,23 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
       mutiFun = function (param1) {
     console.log(param1);
   },
-      mutiVar4 = scopeData,
-      mutiVar5 = cache.getInfo();
+      mutiVar4 = this.scopeData,
+      mutiVar5 = this.cache.getInfo();
 
   var objVar = {
     objVar1: "objVar1",
-    objVar2: scopeData,
+    objVar2: this.scopeData,
     objVar3: function (param1, param2) {
-      param1 = mutiVar1;
-      param2 = $scope.data;
+      param1 = this.mutiVar1;
+      param2 = this.data;
     },
     objVar4(param1, param2) {
-      param1 = mutiVar1;
-      param2 = $scope.data;
-      return objVar4;
+      param1 = this.mutiVar1;
+      param2 = this.data;
+      return this.mutiVar2;
     },
     get value() {
-      return objVar2, objVar1, scopeData.data;
+      return this.mutiVar2, this.mutiVar1, this.scopeData.data;
     },
     set value(value) {
       this.objVar1 = value;
@@ -59,13 +60,13 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
       objFun2: function (param1, param2) {
         console.log(param1, param2);
         mutiVar1 = 12;
-        $scope.data.newValue = mutiVar3;
-        $scope.data["newValue"] = mutiVar3;
-        $scope.data[mutiVar3] = mutiVar3;
-        $scope.data[mutiVar3.mutiVar3Value] = mutiVar3;
-        $scope.data.newValue = "newValue";
+        this.data.newValue = this.mutiVar3;
+        this.data["newValue"] = this.mutiVar3;
+        this.data[this.mutiVar3] = this.mutiVar3;
+        this.data[this.mutiVar3.mutiVar3Value] = this.mutiVar3;
+        this.data.newValue = "newValue";
         var unKnownValue = unKnown;
-        var unKnownValue1 = $scope.unKnown;
+        var unKnownValue1 = this.unKnown;
       },
       objFun3: (p1, p2) => {},
       get value() {},
@@ -74,23 +75,23 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   };
 
   //scope函数初始化
-  $scope.scopeFun = function (param1) {
+  this.scopeFun = function (param1) {
     console.log(param1);
   };
 
   //scope多级初始化函数
-  $scope.data.qq.scopeFun2 = function () {
+  this.data.qq.scopeFun2 = function () {
 
     var subFun2 = _subFun2;
     var subFun1 = function (param1, param2) {};
     subFun2(subFun1().value);
-    subFun1(mutiVar3.mutiVar3Value);
+    subFun1(this.mutiVar3.mutiVar3Value);
     function _subFun2(param1, param2) {}
 
-    var fnMutiValue = mutiVar3.mutiVar3Value;
-    $scope.funScopeVar = "12";
-    decFun();
-    scopeData.funScopeVar1 = "1";
+    var fnMutiValue = this.mutiVar3.mutiVar3Value;
+    this.funScopeVar = "12";
+    this.decFun();
+    this.scopeData.funScopeVar1 = "1";
   };
 
   /**
@@ -101,11 +102,11 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   }
 
   //直接调用
-  mutiFun();
+  this.mutiFun();
   //调用
-  $scope.scopeFun(function (param1) {
+  this.scopeFun(function (param1) {
     console.log(param1);
   });
   // this.scopeFun2();
-  $scope.data.scopeFun2();
+  this.data.scopeFun2();
 }]);
