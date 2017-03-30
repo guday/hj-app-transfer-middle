@@ -12,6 +12,7 @@ app.controller('AboutController', ['$scope', 'cache',
 
         //scope变量初始化
         $scope.data = {};//commment
+        $scope.gdata = {};//commment
         //多级变量申明
         var scopeData = $scope.data = {};
         scopeData = null;
@@ -80,6 +81,7 @@ app.controller('AboutController', ['$scope', 'cache',
             var fnMutiValue = mutiVar3.mutiVar3Value;
             $scope.funScopeVar = "12";
             decFun();
+            scopeData.funScopeVar1 = "1";
 
         };
 

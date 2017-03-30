@@ -32,7 +32,7 @@ var prefixMArr = {
 
 
 var oldDst = getFullAst(oldContent);
-mainTransfer(oldDst)
+mainTransfer(oldDst);
 
 
 function mainTransfer(ast) {
@@ -41,7 +41,9 @@ function mainTransfer(ast) {
     var newAst = null;
     var bodyVariableMap = {};
     var mainScopeMap = {};
-    var referenceNameArr = [];
+    var referenceScopeNameArr = [];
+    var referenceUnRootNameArr = [];
+    var referenceRootNameArr = [];
 
 
     traverse(ast, {
@@ -56,52 +58,9 @@ function mainTransfer(ast) {
                         var controllerName = param.controllerName;
                         var mainFunctionBodyScope = mainFunctionBodyPath.scope;
 
+                        mainScopeMap = getMainBodyScope(mainFunctionBodyPath);
+                        // console.log(mainFunctionBodyScope.bindings["$scope"])
                         mainFunctionBodyPath.traverse({
-                            // ObjectMethod: {
-                            //     enter(path){
-                            //         console.log("ObjectMethod")
-                            //         var node = path.node;
-                            //         // var params = path.get("params");
-                            //         var params = node.params;
-                            //         // var body = path.get("body");
-                            //         var body = node.body;
-                            //         // var async = path.get("async");
-                            //         var async = node.async;
-                            //         // console.log( async)
-                            //         var key = node.key;
-                            //         var kind = node.kind;
-                            //         if (kind == "method") {
-                            //             path.replaceWith(
-                            //                 t.ObjectProperty(key, t.arrowFunctionExpression(params, body, async))
-                            //             );
-                            //         }
-                            //
-                            //     }
-                            // },
-                            // FunctionExpression: {
-                            //     enter(path){
-                            //         console.log("FunctionExpression")
-                            //         var node = path.node;
-                            //         var params = node.params;
-                            //         var body = node.body;
-                            //         var async = node.async;
-                            //         path.replaceWith(
-                            //             t.arrowFunctionExpression(params, body, async)
-                            //         );
-                            //     }
-                            // },
-                            // FunctionDeclaration: {
-                            //     enter(path) {
-                            //         console.log("FunctionDeclaration")
-                            //         var node = path.node;
-                            //         var params = node.params;
-                            //         var body = node.body;
-                            //         var async = node.async;
-                            //         path.replaceWith(
-                            //             t.arrowFunctionExpression(params, body, async)
-                            //         );
-                            //     }
-                            // }
                             Identifier: {
                                 enter(path) {
                                     var node = path.node;
@@ -126,10 +85,10 @@ function mainTransfer(ast) {
                                                 pathKeyArr.push(key);
                                             }
                                             return path.isCallExpression() || path.isAssignmentExpression() || path.isVariableDeclarator();
-                                        })
+                                        });
                                         //按指定规则，匹配到停止位置的node
                                         if (parentPath) {
-                                            console.log(getLine(parentPath), parentPath.scope.uid)
+                                            // console.log(getLine(parentPath), parentPath.scope.uid)
 
                                             // console.log("=>", pathKeyArr, node.loc.start.line)
                                             // var sFlag = false;
@@ -202,13 +161,13 @@ function mainTransfer(ast) {
                                                     if (prefixMArr[testStr]) {
                                                         //找到替换的字段
 
-                                                        var findPath = pathArr[j-1];
+                                                        var findPath = pathArr[j - 1];
                                                         // console.log("=>find", testStr,findPath.node);
                                                         // findPath.replaceWith(t.thisExpression());
                                                         // findPath.replaceWith(t.identifier("this"));
                                                         // console.log("=>find", testStr,findPath.node);
-                                                        referenceNameArr.push({
-                                                            index: j-1,
+                                                        referenceScopeNameArr.push({
+                                                            index: j - 1,
                                                             pathArr,
                                                             nameArr: nodeNameArr
                                                         })
@@ -217,8 +176,38 @@ function mainTransfer(ast) {
                                                     }
                                                 }
                                                 if (!flag) {
-                                                    //未找到，则增加前缀
-                                                    // console.log("===>","error not find", nodeNameArr.join("."))
+                                                    //未找到，则增加this前缀
+
+                                                    // if ( parentPath.scope.uid == 3) {
+                                                    //     console.log("====>",parentPath.scope)
+                                                    // }
+                                                    // if (!path.scope) {
+                                                    //     console.log("--->", error)
+                                                    // }
+                                                    // var isFindInRoot = findInScope(path.scope, path.node.name);
+                                                    var isFindInRoot = findInRootScope(path);
+                                                    if (isFindInRoot == "mainFun") {
+                                                        // console.log("===>", nodeNameArr.join("."), getLine(parentPath), parentPath.scope.uid, path.node.name)
+                                                        // var oldNode = path.node;
+                                                        // path.replaceWith(t.memberExpression(t.thisExpression(), oldNode, false))
+                                                        referenceUnRootNameArr.push({
+                                                            srcPath: path,
+                                                        })
+
+                                                    } else if (isFindInRoot == "ownFun") {
+                                                        //不处理
+                                                        // console.log("ownFun", nodeNameArr.join("."), getLine(parentPath), parentPath.scope.uid, path.node.name)
+                                                    } else if (isFindInRoot == "unFind") {
+                                                        //不处理
+                                                        // console.log("unFind", nodeNameArr.join("."), getLine(parentPath), parentPath.scope.uid, path.node.name)
+                                                    }else if (isFindInRoot == "firstClass") {
+                                                        //
+                                                        // console.log("firstClass", nodeNameArr.join("."), getLine(parentPath), parentPath.scope.uid, path.node.name)
+                                                    } else {
+                                                        // console.log(">", nodeNameArr.join("."), getLine(parentPath), parentPath.scope.uid, path.node.name)
+                                                    }
+
+
                                                 }
 
                                             } else {
@@ -235,6 +224,21 @@ function mainTransfer(ast) {
                             }
                         });
 
+                        referenceScopeNameArr.sort(function (a, b) {
+                            return b.nameArr.length - a.nameArr.length;
+                        })
+                        referenceScopeNameArr.map(function (item) {
+                            // console.log(item.nameArr, item.index, item.pathArr[item.index].node.loc.start.line);
+                            var findIndex = item.index;
+                            var findPath = item.pathArr[findIndex];
+                            findPath.replaceWith(t.identifier("this"))
+                        })
+
+                        referenceUnRootNameArr.map(function (item) {
+                            var path = item.srcPath;
+                            var oldNode = path.node;
+                            path.replaceWith(t.memberExpression(t.thisExpression(), oldNode, false))
+                        })
                     })
                 })
                 // if (node.callee && node.callee.property && keyFunctionNameMap[node.callee.property.name] && node.callee.object && node.callee.object.name == "app") {
@@ -497,6 +501,7 @@ function mainTransfer(ast) {
 
         fs.writeFile(oldDstPath, output.code, "utf8");
     }
+
     //1、取得一级变量列表
     function getBodyInfoName(mainBodyArr) {
         // bodyVariableMap
@@ -708,7 +713,7 @@ function getLine(path) {
     return path.node.loc.start.line
 }
 
-function getAppController(path, callback){
+function getAppController(path, callback) {
     var node = path.node;
     if (node.callee && node.callee.property && keyFunctionNameMap[node.callee.property.name] && node.callee.object && node.callee.object.name == "app") {
         callback && callback();
@@ -759,4 +764,67 @@ function getMainFunctionBody(path, callback) {
     callback && callback(mainBodyFnPath, {
         controllerName
     })
+}
+
+function getMainBodyScope(path) {
+    var scopeMap = {};
+    var node = path.node;
+    for (var i in node.body) {
+        var dstPath = path.get('body.' + i);
+        var dstScope = dstPath.scope;
+        // console.log(dstPath.scope.uid, getLine(dstPath))
+        scopeMap[dstScope.uid] = dstScope;
+    }
+
+}
+
+function findInScope(scope, name) {
+    // console.log("true", scope.uid)
+    if (scope.uid == 1 ) {
+        if (scope.bindings[name]) {
+            return "mainFun";
+        }
+        //遍历到顶部还未找到
+        return "unFind";
+    } else {
+        if (scope.bindings[name]) {
+            //子函数
+            return "ownFun";
+        } else {
+            if (scope.parent) {
+                return findInScope(scope.parent, name);
+            } else {
+                return false;
+            }
+
+        }
+    }
+
+    // }
+}
+
+function findInRootScope(path) {
+    var scope = path.scope;
+    var name = path.node.name;
+    if (scope.uid == 1) {
+        if (scope.bindings[name]) {
+            return "firstClass";
+        }
+        //本身是一级或者二级元素
+        return "unFind";
+    } else {
+        if (scope.bindings[name]) {
+            //子函数
+            return "ownFun";
+        } else {
+            if (scope.parent) {
+                return findInScope(scope.parent, name);
+            } else {
+                return false;
+            }
+
+        }
+    }
+
+
 }

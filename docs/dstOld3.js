@@ -10,9 +10,10 @@
 app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
 
   //scope变量初始化
-  $scope.data = {}; //commment
+  this = {}; //commment
+  this.gdata = {}; //commment
   //多级变量申明
-  var scopeData = $scope.data = {};
+  var scopeData = this = {};
   scopeData = null;
   //单个变量申明
   var singleVariable = 'singleVariable';
@@ -37,13 +38,13 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
       objFun2: function (param1, param2) {
         console.log(param1, param2);
         mutiVar1 = 12;
-        $scope.data.newValue = mutiVar3;
-        $scope.data["newValue"] = mutiVar3;
-        $scope.data[mutiVar3] = mutiVar3;
-        $scope.data[mutiVar3.mutiVar3Value] = mutiVar3;
-        $scope.data.newValue = "newValue";
+        this.newValue = this.mutiVar3;
+        this["newValue"] = this.mutiVar3;
+        this[this.mutiVar3] = this.mutiVar3;
+        this[this.mutiVar3.mutiVar3Value] = this.mutiVar3;
+        this.newValue = "newValue";
         var unKnownValue = unKnown;
-        var unKnownValue1 = $scope.unKnown;
+        var unKnownValue1 = this.unKnown;
       },
       objFun3: (p1, p2) => {},
       get value() {},
@@ -52,21 +53,22 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   };
 
   //scope函数初始化
-  $scope.scopeFun = function (param1) {
+  this.scopeFun = function (param1) {
     console.log(param1);
   };
 
   //scope多级初始化函数
-  $scope.data.qq.scopeFun2 = function () {
+  this.qq.scopeFun2 = function () {
 
     var subFun2 = _subFun2;
     var subFun1 = function (param1, param2) {};
     subFun2(subFun1().value);
-    subFun1(mutiVar3.mutiVar3Value);
+    subFun1(this.mutiVar3.mutiVar3Value);
     function _subFun2(param1, param2) {}
-    var fnMutiValue = mutiVar3.mutiVar3Value;
-    $scope.funScopeVar = "12";
-    decFun();
+    var fnMutiValue = this.mutiVar3.mutiVar3Value;
+    this.funScopeVar = "12";
+    this.decFun();
+    this.scopeData.funScopeVar1 = "1";
   };
 
   /**
@@ -79,9 +81,9 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   //直接调用
   mutiFun();
   //调用
-  $scope.scopeFun(function (param1) {
+  this.scopeFun(function (param1) {
     console.log(param1);
   });
   // this.scopeFun2();
-  $scope.data.scopeFun2();
+  this.scopeFun2();
 }]);
