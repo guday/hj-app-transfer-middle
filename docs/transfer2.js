@@ -240,18 +240,29 @@ function mainTransfer(ast) {
                     // }
                     getBodyInfoName(mainBodyArr);
                     generateClassMethod(constructorInfo, methodBodyInfo);
+
+                    for (var i in bodyVariableMap) {
+                        if (bodyVariableMap[i] == "function") {
+                            console.log("fun", i)
+                        } else {
+                            console.log("var", i)
+                        }
+                    }
                 }
             }
 
         }
     });
 
-    //1、取得一级变量列表
+    /**
+     * 取得一级变量列表
+     * 函数前缀
+     * 变量前缀
+     * */
     function getBodyInfoName(mainBodyArr) {
         // bodyVariableMap
         for (var i in mainBodyArr) {
             var bodyNode = mainBodyArr[i];
-            // console.log("==>", bodyPath.node == bodyNode)
             switch (bodyNode.type) {
                 case "VariableDeclaration":
                     var headInfo = [];
@@ -262,10 +273,15 @@ function mainTransfer(ast) {
                             if (bodyVariableMap[fnName]) {
                                 reportError(10);
                             }
-                            bodyVariableMap[fnName] = true;
-                        }else {}
+                            bodyVariableMap[fnName] = "function";
+                        } else {
+                            var varName = getNodeName(itemNode.id);
+                            if (bodyVariableMap[varName]) {
+                                reportError(20);
+                            }
+                            bodyVariableMap[varName] = "var";
+                        }
                     }
-
 
                     break;
                 case "ExpressionStatement":
@@ -276,7 +292,13 @@ function mainTransfer(ast) {
                             if (bodyVariableMap[fnName]) {
                                 reportError(11);
                             }
-                            bodyVariableMap[fnName] = true;
+                            bodyVariableMap[fnName] = "function";
+                        } else {
+                            var varName = getNodeName(expression.left);
+                            if (bodyVariableMap[varName]) {
+                                reportError(11);
+                            }
+                            bodyVariableMap[varName] = "var";
                         }
                     }
 
@@ -287,7 +309,7 @@ function mainTransfer(ast) {
                     if (bodyVariableMap[fnName]) {
                         reportError(11);
                     }
-                    bodyVariableMap[fnName] = true;
+                    bodyVariableMap[fnName] = "function";
                     break;
                 case "IfStatement":
                 case "TryStatement":
@@ -407,17 +429,17 @@ function getNodeName(node) {
     }
 
     var name = nameArr.join(".");
-    console.log("==>", name)
+    // console.log("==>", name)
     return name;
 
     function deepMemberExpression(subNode) {
-            if (subNode.type == "MemberExpression") {
-                deepMemberExpression(subNode.object);
-                nameArr.push(subNode.property.name);
-            } else if (subNode.type == "Identifier") {
-                nameArr.push(subNode.name);
-            } else {
-                //error
-            }
+        if (subNode.type == "MemberExpression") {
+            deepMemberExpression(subNode.object);
+            nameArr.push(subNode.property.name);
+        } else if (subNode.type == "Identifier") {
+            nameArr.push(subNode.name);
+        } else {
+            //error
+        }
     }
 }

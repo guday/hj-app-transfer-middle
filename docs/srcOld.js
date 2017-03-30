@@ -14,6 +14,7 @@ app.controller('AboutController', ['$scope', 'cache',
         $scope.data = {};//commment
         //多级变量申明
         var scopeData = $scope.data = {};
+        scopeData = null;
         //单个变量申明
         var singleVariable = 'singleVariable';
         //多个变量申明， 包括函数
@@ -93,6 +94,7 @@ app.controller('AboutController', ['$scope', 'cache',
         $scope.scopeFun(function (param1) {
             console.log(param1)
         });
+        // this.scopeFun2();
         $scope.data.scopeFun2();
 
 

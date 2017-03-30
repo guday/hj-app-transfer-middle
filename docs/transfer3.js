@@ -22,6 +22,14 @@ var oldPath = "./srcOld.js";
 var oldDstPath = "./dstOld3.js";
 var oldContent = fs.readFileSync(oldPath, "utf8");
 
+
+var prefixMArr = {
+    "$scope.data": true,
+    "$scope.func": true,
+    "$scope": true,
+}
+
+
 var oldDst = getFullAst(oldContent);
 mainTransfer(oldDst)
 
@@ -52,8 +60,6 @@ function mainTransfer(ast) {
                     var controllerName = args[0].value;
                     var mainArr = args[1].elements;
 
-                    // console.log(mainArrPath)
-                    //controller name
                     // console.log("controllerName", controllerName)
                     if (!mainArr.length) {
                         //报错
@@ -89,6 +95,7 @@ function mainTransfer(ast) {
 
                     var mapObj = {};
                     var mapObj1 = {};
+                    var referenceNameArr = [];
                     for (var i in mainBodyArr) {
                         var bodyPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body.body." + i);
                         // console.log("==>", bodyPath.node)
@@ -142,10 +149,7 @@ function mainTransfer(ast) {
                                 enter(path) {
                                     var node = path.node;
 
-                                    // if (node.name != "param2" && node.name != "mutiFun" && node.name != "mutiVar3") {
-                                    //     return;
-                                    // }
-
+                                    //遍历引用的变量
                                     if (path.isReferencedIdentifier()) {
                                         var pathKeyArr = [];
                                         var parentPath = path.find(function (path) {
@@ -160,7 +164,8 @@ function mainTransfer(ast) {
 
                                             if (key != parentKey) {
                                                 if (parentKey == "arguments") {
-                                                    pathKeyArr.push(key);
+                                                    // pathKeyArr.push(key);
+                                                    parentKey = parentKey + "." + key;
                                                 }
                                                 pathKeyArr.push(parentKey);
                                             } else {
@@ -168,14 +173,15 @@ function mainTransfer(ast) {
                                             }
                                             return path.isCallExpression() || path.isAssignmentExpression() || path.isVariableDeclarator();
                                         })
+                                        //按指定规则，匹配到停止位置的node
                                         if (parentPath) {
 
-                                            console.log("=>", pathKeyArr, node.loc.start.line)
-                                            var sFlag = false;
-                                            if (pathKeyArr[0] == "1") {
-                                                // console.log("==>", parentPath.node);
-                                                sFlag = true;
-                                            }
+                                            // console.log("=>", pathKeyArr, node.loc.start.line)
+                                            // var sFlag = false;
+                                            // if (pathKeyArr[0] == "1") {
+                                            //     // console.log("==>", parentPath.node);
+                                            //     sFlag = true;
+                                            // }
 
                                             var itemNameMap = {
                                                 "left": true,
@@ -189,19 +195,35 @@ function mainTransfer(ast) {
 
                                             if (pathKeyArr.length > 0) {
                                                 var dstNode = parentPath.node;
+                                                var dstPath = parentPath;
                                                 var flag = false;
+                                                var referencePathNameArr = [];
+                                                var dstNodeName;
                                                 for (var j = 0, len = pathKeyArr.length; j < len - 1; j++) {
                                                     var itemName = pathKeyArr[j];
 
-                                                    if (itemNameMap[itemName]) {
+
+                                                    if (itemNameMap[itemName] || itemName.indexOf("arguments") > -1) {
+
                                                         for (var k = len - 2; k >= j; k--) {
-                                                            if (pathKeyArr[k] == "arguments") {
-                                                                j--;
-                                                            }
-                                                            dstNode = dstNode[pathKeyArr[k]];
+                                                            // if (pathKeyArr[k] == "arguments") {
+                                                            //     j--;
+                                                            // }
+                                                            // dstNode = dstNode[pathKeyArr[k]];
+                                                            // console.log("k", pathKeyArr[k],k)
+                                                            dstPath = dstPath.get(pathKeyArr[k]);
+                                                            // var dstNodeName = getNodeName(dstPath, node, function (nameArr) {
+                                                            //     // console.log(nameArr);
+                                                            //     // var name = nameArr.join(".");
+                                                            // });
+                                                            // var nameArr = dstNodeName.nameArr;
+                                                            // console.log(nameArr)
+                                                            referencePathNameArr.push(dstNodeName);
+
                                                         }
-                                                        // sFlag && console.log("::", dstNode)
-                                                        var dstNodeName = getNodeName(dstNode, node);
+                                                        // var dstNodeName = getNodeName(dstNode, node);
+                                                        dstNodeName = getNodeName(dstPath, node);
+                                                        // referenceNameArr.push(dstNodeName);
                                                         // console.log(dstNode);
                                                         //
                                                         flag = true;
@@ -210,8 +232,40 @@ function mainTransfer(ast) {
                                                     // dstNode =
                                                 }
                                                 if (!flag) {
-                                                    console.log("===>", "error1")
+                                                    console.log("===>", "error1", k);
+                                                    // console.log(dstPath.node);
                                                 }
+
+                                                var pathArr = dstNodeName.pathArr;
+                                                var nodeNameArr = dstNodeName.nameArr;
+                                                flag = false;
+                                                // console.log("=>len", nodeNameArr.length)
+                                                for (var j = nodeNameArr.length; j > 0; j--) {
+                                                    var testArr = nodeNameArr.slice(0, j);
+                                                    var testStr = testArr.join(".");
+                                                    // console.log("=>testStr", testStr)
+                                                    if (prefixMArr[testStr]) {
+                                                        //找到替换的字段
+
+                                                        var findPath = pathArr[j-1];
+                                                        // console.log("=>find", testStr,findPath.node);
+                                                        // findPath.replaceWith(t.thisExpression());
+                                                        // findPath.replaceWith(t.identifier("this"));
+                                                        // console.log("=>find", testStr,findPath.node);
+                                                        referenceNameArr.push({
+                                                            index: j-1,
+                                                            pathArr,
+                                                            nameArr: nodeNameArr
+                                                        })
+                                                        flag = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (!flag) {
+                                                    //未找到，则增加前缀
+                                                    // console.log("===>","error not find", nodeNameArr.join("."))
+                                                }
+
                                             } else {
                                                 console.log("===>", "error0")
                                             }
@@ -228,15 +282,34 @@ function mainTransfer(ast) {
 
                     }
 
+                    referenceNameArr.sort(function (a, b) {
+                        return b.nameArr.length - a.nameArr.length;
+                    })
+                    referenceNameArr.map(function (item) {
+                        console.log(item.nameArr, item.index, item.pathArr[item.index].node.loc.start.line);
+                        var findIndex = item.index;
+                        var findPath = item.pathArr[findIndex];
+                        findPath.replaceWith(t.identifier("this"))
+                    })
+
+
+
                     // console.log(JSON.stringify(mapObj), JSON.stringify(mapObj1))
                     // // getBodyInfoName(mainBodyArr);
                     // generateClassMethod(constructorInfo, methodBodyInfo);
+
                 }
             }
 
         }
     });
+    generateTest();
 
+    function generateTest() {
+        var output = generate(ast);
+
+        fs.writeFile(oldDstPath, output.code, "utf8");
+    }
     //1、取得一级变量列表
     function getBodyInfoName(mainBodyArr) {
         // bodyVariableMap
@@ -384,51 +457,62 @@ function reportError(type) {
     console.log("error:", type)
 }
 
-function getNodeName(node, srcNode) {
+function getNodeName(nodePath, srcNode) {
 
-    var srcName = srcNode.name;
+    var node = nodePath.node;
+
+    //被引用的变量
+    var keyName = srcNode.name;
 
     var nameArr = [];
+    var pathArr = [];
     switch (node.type) {
         case "Identifier":
-            pushValue(node.name);
+            pushValue(node.name, nodePath);
             break;
         case "MemberExpression":
-            deepMemberExpression(node)
+            deepMemberExpression(nodePath);
             break;
         default:
             //error
             break;
     }
 
-    var preFixArr = [];
+    var extraNameArr = [];
     if (!nameArr.length) {
         console.log("=>", "error");
     } else {
-        if (nameArr[0] != srcName) {
-            console.log("=>", "nameError");
-        } else {
-            preFixArr = nameArr.slice(1);
-        }
+        extraNameArr = nameArr.slice(1);
     }
 
     var name = nameArr.join(".");
-    var preFixName = preFixArr.join(".");
-    console.log("==>", name, ":", srcName, preFixName)
-    return name;
+    var preFixName = extraNameArr.join(".");
+    // console.log("==>", name, ":", keyName, preFixName)
+    return {
+        name,
+        keyName,
+        nameArr,
+        extraNameArr,
+        pathArr
+    };
 
-    function deepMemberExpression(subNode) {
+    function deepMemberExpression(subNodePath) {
+        var subNode = subNodePath.node;
         if (subNode.type == "MemberExpression") {
-            deepMemberExpression(subNode.object);
-            pushValue(subNode.property.name);
+            deepMemberExpression(subNodePath.get("object"));
+            pushValue(subNode.property.name, subNodePath);
         } else if (subNode.type == "Identifier") {
-            pushValue(subNode.name);
+            pushValue(subNode.name, subNodePath);
         } else {
             //error
         }
     }
 
-    function pushValue(value) {
-        value != undefined && nameArr.push(value);
+    function pushValue(value, path) {
+        if (value != undefined) {
+            nameArr.push(value);
+            pathArr.push(path);
+
+        }
     }
 }
