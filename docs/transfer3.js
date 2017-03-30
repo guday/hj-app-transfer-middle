@@ -1,4 +1,5 @@
 /**
+ * 前缀替换
  */
 var babylon = require("babylon");
 var traverse = require("babel-traverse").default;
@@ -39,6 +40,8 @@ function mainTransfer(ast) {
 
     var newAst = null;
     var bodyVariableMap = {};
+    var mainScopeMap = {};
+    var referenceNameArr = [];
 
 
     traverse(ast, {
@@ -48,58 +51,12 @@ function mainTransfer(ast) {
             enter: function (path) {
                 var node = path.node;
                 //app.controller
-                if (node.callee && node.callee.property && keyFunctionNameMap[node.callee.property.name] && node.callee.object && node.callee.object.name == "app") {
-                    //app.controller
-                    var args = node.arguments;
-                    if (args.length != 2) {
-                        reportError(1);
-                        //报错
-                        return;
-                    }
+                getAppController(path, function () {
+                    getMainFunctionBody(path, function (mainFunctionBodyPath, param) {
+                        var controllerName = param.controllerName;
+                        var mainFunctionBodyScope = mainFunctionBodyPath.scope;
 
-                    var controllerName = args[0].value;
-                    var mainArr = args[1].elements;
-
-                    // console.log("controllerName", controllerName)
-                    if (!mainArr.length) {
-                        //报错
-                        reportError(2);
-                        return;
-                    }
-
-                    var injectArr = [];
-                    var i = 0, len = mainArr.length - 1
-                    for (; i < len; i++) {
-                        injectArr.push(mainArr[i].value);
-                    }
-                    var mainFunctionIndex = i;
-                    //mainFunction
-                    var mainFn = mainArr[mainFunctionIndex];
-                    if (mainFn.type != "FunctionExpression") {
-                        //报错
-                        reportError(3);
-                        return;
-                    }
-                    //mainFunctionBody
-                    var mainBodyArr = mainFn.body.body;
-                    if (!mainBodyArr.length) {
-                        //报错
-                        reportError(4);
-                        return;
-                    }
-
-
-                    generateMain(controllerName, injectArr);
-                    var constructorInfo = [];
-                    var methodBodyInfo = [];
-
-                    var mapObj = {};
-                    var mapObj1 = {};
-                    var referenceNameArr = [];
-                    for (var i in mainBodyArr) {
-                        var bodyPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body.body." + i);
-                        // console.log("==>", bodyPath.node)
-                        bodyPath.traverse({
+                        mainFunctionBodyPath.traverse({
                             // ObjectMethod: {
                             //     enter(path){
                             //         console.log("ObjectMethod")
@@ -154,9 +111,6 @@ function mainTransfer(ast) {
                                         var pathKeyArr = [];
                                         var parentPath = path.find(function (path) {
 
-                                            mapObj[path.key] = true;
-                                            mapObj1[path.parentKey] = true;
-
                                             // console.log("key",path.key)
                                             // console.log("parentKey",path.parentKey)
                                             var key = path.key;
@@ -175,6 +129,7 @@ function mainTransfer(ast) {
                                         })
                                         //按指定规则，匹配到停止位置的node
                                         if (parentPath) {
+                                            console.log(getLine(parentPath), parentPath.scope.uid)
 
                                             // console.log("=>", pathKeyArr, node.loc.start.line)
                                             // var sFlag = false;
@@ -280,25 +235,257 @@ function mainTransfer(ast) {
                             }
                         });
 
-                    }
-
-                    referenceNameArr.sort(function (a, b) {
-                        return b.nameArr.length - a.nameArr.length;
                     })
-                    referenceNameArr.map(function (item) {
-                        console.log(item.nameArr, item.index, item.pathArr[item.index].node.loc.start.line);
-                        var findIndex = item.index;
-                        var findPath = item.pathArr[findIndex];
-                        findPath.replaceWith(t.identifier("this"))
-                    })
-
-
-
-                    // console.log(JSON.stringify(mapObj), JSON.stringify(mapObj1))
-                    // // getBodyInfoName(mainBodyArr);
-                    // generateClassMethod(constructorInfo, methodBodyInfo);
-
-                }
+                })
+                // if (node.callee && node.callee.property && keyFunctionNameMap[node.callee.property.name] && node.callee.object && node.callee.object.name == "app") {
+                //     //app.controller
+                //     // var args = node.arguments;
+                //     // if (args.length != 2) {
+                //     //     reportError(1);
+                //     //     //报错
+                //     //     return;
+                //     // }
+                //     //
+                //     // var controllerName = args[0].value;
+                //     // var mainArr = args[1].elements;
+                //     //
+                //     // // console.log("controllerName", controllerName)
+                //     // if (!mainArr.length) {
+                //     //     //报错
+                //     //     reportError(2);
+                //     //     return;
+                //     // }
+                //     //
+                //     // var injectArr = [];
+                //     // var i = 0, len = mainArr.length - 1
+                //     // for (; i < len; i++) {
+                //     //     injectArr.push(mainArr[i].value);
+                //     // }
+                //     // var mainFunctionIndex = i;
+                //     // //mainFunction
+                //     // var mainFn = mainArr[mainFunctionIndex];
+                //     // if (mainFn.type != "FunctionExpression") {
+                //     //     //报错
+                //     //     reportError(3);
+                //     //     return;
+                //     // }
+                //     // //mainFunctionBody
+                //     // var mainBodyArr = mainFn.body.body;
+                //     // if (!mainBodyArr.length) {
+                //     //     //报错
+                //     //     reportError(4);
+                //     //     return;
+                //     // }
+                //
+                //
+                //     generateMain(controllerName, injectArr);
+                //     var constructorInfo = [];
+                //     var methodBodyInfo = [];
+                //     var mainBodyFnPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body");
+                //     var mainBodyScope = mainBodyFnPath.scope;
+                //     // console.log("body", util.inspect(mainBodyFnPath.scope))
+                //     mainScopeMap[mainBodyScope.uid] = mainBodyScope;
+                //     var referenceNameArr = [];
+                //     for (var i in mainBodyArr) {
+                //         var bodyPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body.body." + i);
+                //         // console.log("==>", bodyPath.node)
+                //         bodyPath.traverse({
+                //             // ObjectMethod: {
+                //             //     enter(path){
+                //             //         console.log("ObjectMethod")
+                //             //         var node = path.node;
+                //             //         // var params = path.get("params");
+                //             //         var params = node.params;
+                //             //         // var body = path.get("body");
+                //             //         var body = node.body;
+                //             //         // var async = path.get("async");
+                //             //         var async = node.async;
+                //             //         // console.log( async)
+                //             //         var key = node.key;
+                //             //         var kind = node.kind;
+                //             //         if (kind == "method") {
+                //             //             path.replaceWith(
+                //             //                 t.ObjectProperty(key, t.arrowFunctionExpression(params, body, async))
+                //             //             );
+                //             //         }
+                //             //
+                //             //     }
+                //             // },
+                //             // FunctionExpression: {
+                //             //     enter(path){
+                //             //         console.log("FunctionExpression")
+                //             //         var node = path.node;
+                //             //         var params = node.params;
+                //             //         var body = node.body;
+                //             //         var async = node.async;
+                //             //         path.replaceWith(
+                //             //             t.arrowFunctionExpression(params, body, async)
+                //             //         );
+                //             //     }
+                //             // },
+                //             // FunctionDeclaration: {
+                //             //     enter(path) {
+                //             //         console.log("FunctionDeclaration")
+                //             //         var node = path.node;
+                //             //         var params = node.params;
+                //             //         var body = node.body;
+                //             //         var async = node.async;
+                //             //         path.replaceWith(
+                //             //             t.arrowFunctionExpression(params, body, async)
+                //             //         );
+                //             //     }
+                //             // }
+                //             Identifier: {
+                //                 enter(path) {
+                //                     var node = path.node;
+                //
+                //                     //遍历引用的变量
+                //                     if (path.isReferencedIdentifier()) {
+                //                         var pathKeyArr = [];
+                //                         var parentPath = path.find(function (path) {
+                //
+                //                             // console.log("key",path.key)
+                //                             // console.log("parentKey",path.parentKey)
+                //                             var key = path.key;
+                //                             var parentKey = path.parentKey;
+                //
+                //                             if (key != parentKey) {
+                //                                 if (parentKey == "arguments") {
+                //                                     // pathKeyArr.push(key);
+                //                                     parentKey = parentKey + "." + key;
+                //                                 }
+                //                                 pathKeyArr.push(parentKey);
+                //                             } else {
+                //                                 pathKeyArr.push(key);
+                //                             }
+                //                             return path.isCallExpression() || path.isAssignmentExpression() || path.isVariableDeclarator();
+                //                         })
+                //                         //按指定规则，匹配到停止位置的node
+                //                         if (parentPath) {
+                //                             console.log(getLine(parentPath), parentPath.scope.uid)
+                //
+                //                             // console.log("=>", pathKeyArr, node.loc.start.line)
+                //                             // var sFlag = false;
+                //                             // if (pathKeyArr[0] == "1") {
+                //                             //     // console.log("==>", parentPath.node);
+                //                             //     sFlag = true;
+                //                             // }
+                //
+                //                             var itemNameMap = {
+                //                                 "left": true,
+                //                                 "callee": true,
+                //                                 "right": true,
+                //                                 "arguments": true,
+                //                                 // "object": true,
+                //                                 "init": true,
+                //                                 "property": true,
+                //                             }
+                //
+                //                             if (pathKeyArr.length > 0) {
+                //                                 var dstNode = parentPath.node;
+                //                                 var dstPath = parentPath;
+                //                                 var flag = false;
+                //                                 var referencePathNameArr = [];
+                //                                 var dstNodeName;
+                //                                 for (var j = 0, len = pathKeyArr.length; j < len - 1; j++) {
+                //                                     var itemName = pathKeyArr[j];
+                //
+                //
+                //                                     if (itemNameMap[itemName] || itemName.indexOf("arguments") > -1) {
+                //
+                //                                         for (var k = len - 2; k >= j; k--) {
+                //                                             // if (pathKeyArr[k] == "arguments") {
+                //                                             //     j--;
+                //                                             // }
+                //                                             // dstNode = dstNode[pathKeyArr[k]];
+                //                                             // console.log("k", pathKeyArr[k],k)
+                //                                             dstPath = dstPath.get(pathKeyArr[k]);
+                //                                             // var dstNodeName = getNodeName(dstPath, node, function (nameArr) {
+                //                                             //     // console.log(nameArr);
+                //                                             //     // var name = nameArr.join(".");
+                //                                             // });
+                //                                             // var nameArr = dstNodeName.nameArr;
+                //                                             // console.log(nameArr)
+                //                                             referencePathNameArr.push(dstNodeName);
+                //
+                //                                         }
+                //                                         // var dstNodeName = getNodeName(dstNode, node);
+                //                                         dstNodeName = getNodeName(dstPath, node);
+                //                                         // referenceNameArr.push(dstNodeName);
+                //                                         // console.log(dstNode);
+                //                                         //
+                //                                         flag = true;
+                //                                         break;
+                //                                     }
+                //                                     // dstNode =
+                //                                 }
+                //                                 if (!flag) {
+                //                                     console.log("===>", "error1", k);
+                //                                     // console.log(dstPath.node);
+                //                                 }
+                //
+                //                                 var pathArr = dstNodeName.pathArr;
+                //                                 var nodeNameArr = dstNodeName.nameArr;
+                //                                 flag = false;
+                //                                 // console.log("=>len", nodeNameArr.length)
+                //                                 for (var j = nodeNameArr.length; j > 0; j--) {
+                //                                     var testArr = nodeNameArr.slice(0, j);
+                //                                     var testStr = testArr.join(".");
+                //                                     // console.log("=>testStr", testStr)
+                //                                     if (prefixMArr[testStr]) {
+                //                                         //找到替换的字段
+                //
+                //                                         var findPath = pathArr[j-1];
+                //                                         // console.log("=>find", testStr,findPath.node);
+                //                                         // findPath.replaceWith(t.thisExpression());
+                //                                         // findPath.replaceWith(t.identifier("this"));
+                //                                         // console.log("=>find", testStr,findPath.node);
+                //                                         referenceNameArr.push({
+                //                                             index: j-1,
+                //                                             pathArr,
+                //                                             nameArr: nodeNameArr
+                //                                         })
+                //                                         flag = true;
+                //                                         break;
+                //                                     }
+                //                                 }
+                //                                 if (!flag) {
+                //                                     //未找到，则增加前缀
+                //                                     // console.log("===>","error not find", nodeNameArr.join("."))
+                //                                 }
+                //
+                //                             } else {
+                //                                 console.log("===>", "error0")
+                //                             }
+                //                         } else {
+                //                             //error
+                //                             console.log("===>", "error")
+                //                         }
+                //                     }
+                //
+                //
+                //                 }
+                //             }
+                //         });
+                //
+                //     }
+                //
+                //     referenceNameArr.sort(function (a, b) {
+                //         return b.nameArr.length - a.nameArr.length;
+                //     })
+                //     referenceNameArr.map(function (item) {
+                //         console.log(item.nameArr, item.index, item.pathArr[item.index].node.loc.start.line);
+                //         var findIndex = item.index;
+                //         var findPath = item.pathArr[findIndex];
+                //         findPath.replaceWith(t.identifier("this"))
+                //     })
+                //
+                //
+                //
+                //     // // getBodyInfoName(mainBodyArr);
+                //     // generateClassMethod(constructorInfo, methodBodyInfo);
+                //
+                // }
             }
 
         }
@@ -515,4 +702,61 @@ function getNodeName(nodePath, srcNode) {
 
         }
     }
+}
+
+function getLine(path) {
+    return path.node.loc.start.line
+}
+
+function getAppController(path, callback){
+    var node = path.node;
+    if (node.callee && node.callee.property && keyFunctionNameMap[node.callee.property.name] && node.callee.object && node.callee.object.name == "app") {
+        callback && callback();
+    }
+}
+
+function getMainFunctionBody(path, callback) {
+    var node = path.node;
+    var args = node.arguments;
+    if (args.length != 2) {
+        reportError(1);
+        //报错
+        return;
+    }
+
+    var controllerName = args[0].value;
+    var mainArr = args[1].elements;
+
+    // console.log("controllerName", controllerName)
+    if (!mainArr.length) {
+        //报错
+        reportError(2);
+        return;
+    }
+
+    var injectArr = [];
+    var i = 0, len = mainArr.length - 1
+    for (; i < len; i++) {
+        injectArr.push(mainArr[i].value);
+    }
+    var mainFunctionIndex = i;
+    //mainFunction
+    var mainFn = mainArr[mainFunctionIndex];
+    if (mainFn.type != "FunctionExpression") {
+        //报错
+        reportError(3);
+        return;
+    }
+    //mainFunctionBody
+    var mainBodyArr = mainFn.body.body;
+    if (!mainBodyArr.length) {
+        //报错
+        reportError(4);
+        return;
+    }
+    var mainBodyFnPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body");
+
+    callback && callback(mainBodyFnPath, {
+        controllerName
+    })
 }

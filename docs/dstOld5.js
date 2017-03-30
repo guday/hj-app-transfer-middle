@@ -65,8 +65,6 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
     subFun1(mutiVar3.mutiVar3Value);
     function _subFun2(param1, param2) {}
     var fnMutiValue = mutiVar3.mutiVar3Value;
-    $scope.funScopeVar = "12";
-    decFun();
   };
 
   /**

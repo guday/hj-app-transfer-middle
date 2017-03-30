@@ -78,6 +78,8 @@ app.controller('AboutController', ['$scope', 'cache',
 
             }
             var fnMutiValue = mutiVar3.mutiVar3Value;
+            $scope.funScopeVar = "12";
+            decFun();
 
         };
 
