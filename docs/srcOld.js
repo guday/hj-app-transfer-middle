@@ -12,9 +12,9 @@ app.controller('AboutController', ['$scope', 'cache',
 
         //scope变量初始化
         $scope.data = {};//commment
-        $scope.gdata = {};//commment
         //多级变量申明
         var scopeData = $scope.data = {};
+        //变量赋值
         scopeData = null;
         //单个变量申明
         var singleVariable = 'singleVariable';
@@ -25,8 +25,28 @@ app.controller('AboutController', ['$scope', 'cache',
             mutiFun = function (param1) {
                 console.log(param1)
             },
-            mutiVar4 = 100;
+            mutiVar4 = scopeData,
+            mutiVar5 = cache.getInfo();
 
+        var objVar = {
+            objVar1: "objVar1",
+            objVar2: scopeData,
+            objVar3: function (param1, param2) {
+                param1 = mutiVar1;
+                param2 = $scope.data;
+            },
+            objVar4(param1, param2){
+                param1 = mutiVar1;
+                param2 = $scope.data;
+                return objVar1;
+            },
+            get value() {
+                return objVar2,objVar1, scopeData.data;
+            },
+            set value(value) {
+                this.objVar1 = value
+            }
+        }
 
         //函数直接申明
         var singleFun = function (param1) {
@@ -78,6 +98,7 @@ app.controller('AboutController', ['$scope', 'cache',
             function _subFun2(param1, param2) {
 
             }
+
             var fnMutiValue = mutiVar3.mutiVar3Value;
             $scope.funScopeVar = "12";
             decFun();
