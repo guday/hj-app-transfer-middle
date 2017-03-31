@@ -76,9 +76,13 @@ app.controller('AboutController', ['$scope', 'cache',
                     $scope.data["newValue"] = mutiVar3;
                     $scope.data[mutiVar3] = mutiVar3;
                     $scope.data[mutiVar3.mutiVar3Value] = mutiVar3;
+                    $scope.data[$scope.funScopeVar] = mutiVar3;
                     $scope.data.newValue = "newValue";
                     var unKnownValue = unKnown;
                     var unKnownValue1 = $scope.unKnown;
+                    $scope.data.qq.scopeFun2();
+                    $scope.scopeFun();
+                    decFun();
                 },
                 objFun3: (p1, p2) => {
 
@@ -93,6 +97,9 @@ app.controller('AboutController', ['$scope', 'cache',
 
         }
 
+        var xx =  (a,b)=> {
+
+        }
         //scope函数初始化
         $scope.scopeFun = function (param1) {
             console.log(param1)
@@ -106,7 +113,7 @@ app.controller('AboutController', ['$scope', 'cache',
 
             };
             subFun2(subFun1().value);
-            subFun1(mutiVar3.mutiVar3Value);
+            subFun1(mutiVar3.mutiVar3Value, $scope.data);
             function _subFun2(param1, param2) {
 
             }

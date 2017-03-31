@@ -14,15 +14,14 @@ var keyFunctionNameMap = {
 
 var oldPath = "./srcOld.js";
 var oldDstPath = "./dstOld6.js";
+var oldDstPath2 = "./dstOld61.js";
 var oldContent = fs.readFileSync(oldPath, "utf8");
 
+var varPrefixMap = [
+    "$scope",
+    "scopeFun",
 
-var prefixMArr = {
-    // "$scope.data": true,
-    // "$scope.func": true,
-    "$scope": true,
-}
-
+]
 
 var oldDst = getFullAst(oldContent);
 
@@ -31,13 +30,13 @@ mainTransfer(oldDst);
 var mainFunctionBodyScopeId = 0;
 function mainTransfer(ast) {
 
-
     var newAst = null;
     var bodyVariableMap = {};
 
     var mainFunctionBodyPath = null;
 
     var controllerName = "";
+    var injectArr = [];
     var nodeScopeTypeMap = {
         "mainFun": [],
         "firstClass": []
@@ -53,9 +52,14 @@ function mainTransfer(ast) {
                 getAppController(path, function () {
                     getMainFunctionBody(path, function (path, param) {
                         controllerName = param.controllerName;
+                        injectArr = param.injectArr;
                         mainFunctionBodyPath = path;
                         mainFunctionBodyScopeId = path.scope.uid;
                         // console.log(mainFunctionBodyScope.bindings["$scope"])
+
+                        testFun(mainFunctionBodyPath);
+                        // var testPath = mainFunctionBodyPath.get("body.6");
+                        // console.log(testPath.scope.bindings["decFun"].referencePaths)
                     })
                 })
             }
@@ -79,7 +83,7 @@ function mainTransfer(ast) {
                         // if (node.name == "objVar4") {
                         // console.log("======>", getLine(path), findResult, node.name);
                         nodeScopeTypeMap[findResult] = nodeScopeTypeMap[findResult] || [];
-                        nodeScopeTypeMap[findResult].push(path)
+                        nodeScopeTypeMap[findResult].push(path);
                         // }
                         // console.log(node.name)
                         // } else {
@@ -106,6 +110,11 @@ function mainTransfer(ast) {
         for (var i in processArr) {
             var path = processArr[i];
             var name = path.node.name;
+            // if (name == "decFun") {
+            //     console.log(name,"=>", getLine(path), path.scope)
+            //
+            // }
+
             if (name == "$scope") {
                 path.replaceWith(t.identifier("this"))
             } else {
@@ -131,10 +140,11 @@ function mainTransfer(ast) {
                 getAppController(path, function () {
                     getMainFunctionBody(path, function (path, param) {
                         controllerName = param.controllerName;
+                        injectArr = param.injectArr;
                         mainFunctionBodyPath = path;
                         mainFunctionBodyScopeId = path.scope.uid;
                         //下面的执行一定要放在traverse中，否则查不到contexts
-                        processBodyFunction(mainFunctionBodyPath);
+                        processBodyRoot(mainFunctionBodyPath);
                     })
                 })
             }
@@ -142,12 +152,45 @@ function mainTransfer(ast) {
         }
     });
 
+    //全部转箭头函数
+    replaceToArrowFunction(mainFunctionBodyPath);
+
+    //因为之前ast执行过替换，上下文已经乱了，所以，再来一次
+    output = generate(ast);
+    ast = getFullAst(output.code);
+
+    //找到mainFunction
+    traverse(ast, {
+        //直接调用的表达式
+        CallExpression: {
+            enter: function (path) {
+                var node = path.node;
+                //app.controller
+                getAppController(path, function () {
+                    getMainFunctionBody(path, function (path, param) {
+                        controllerName = param.controllerName;
+                        injectArr = param.injectArr;
+                        mainFunctionBodyPath = path;
+                        mainFunctionBodyScopeId = path.scope.uid;
+                        //下面的执行一定要放在traverse中，否则查不到contexts
+                    })
+                })
+            }
+
+        }
+    });
+
+    //进行class构造转换
+    generateClassStructure({
+        controllerName, injectArr, mainFunctionBodyPath
+    })
+
     generateTest();
 
     function generateTest() {
         var output = generate(ast);
 
-        fs.writeFile(oldDstPath, output.code, "utf8");
+        fs.writeFile(oldDstPath2, output.code, "utf8");
     }
 
 
@@ -219,7 +262,7 @@ function getNodeName(nodePath, srcNode, pathKeyArr) {
 }
 
 function getLine(path) {
-    return path.node.loc.start.line
+    return path.node.loc && path.node.loc.start && path.node.loc.start.line || "-1"
 }
 
 function getAppController(path, callback) {
@@ -271,7 +314,8 @@ function getMainFunctionBody(path, callback) {
     var mainBodyFnPath = path.get("arguments.1.elements." + mainFunctionIndex + ".body");
 
     callback && callback(mainBodyFnPath, {
-        controllerName
+        controllerName,
+        injectArr
     })
 }
 
@@ -423,7 +467,7 @@ function parseBodyStructure(path) {
 }
 
 //对一级结果下的变量，函数申明，进行前缀替换
-function processBodyFunction(path) {
+function processBodyRoot(path) {
     var variableArr = [];
     var functionArr = [];
     for (var i in path.scope.bindings) {
@@ -466,6 +510,254 @@ function processBodyFunction(path) {
     transformExpressionStatement(functionArr);
 
     parseBodyStructure(path);
+
+
+}
+
+
+function replaceToArrowFunction(path) {
+    // var node = path.node;
+    // for (var i in node.body) {
+    //     var bodyPath = path.get("body." + i);
+
+    // console.log("body=>", bodyPath.node.expression.left)
+    path.traverse({
+        ObjectMethod: {
+            enter(path){
+                // console.log("ObjectMethod")
+                var node = path.node;
+                // var params = path.get("params");
+                var params = node.params;
+                // var body = path.get("body");
+                var body = node.body;
+                // var async = path.get("async");
+                var async = node.async;
+                // console.log( async)
+                var key = node.key;
+                var kind = node.kind;
+                if (kind == "method") {
+                    path.replaceWith(
+                        t.ObjectProperty(key, t.arrowFunctionExpression(params, body, async))
+                    );
+                }
+
+            }
+        },
+        FunctionExpression: {
+            enter(path){
+                // console.log("FunctionExpression")
+                var node = path.node;
+                var params = node.params;
+                var body = node.body;
+                var async = node.async;
+                path.replaceWith(
+                    t.arrowFunctionExpression(params, body, async)
+                );
+            }
+        },
+        // FunctionDeclaration: {
+        //     enter(path) {
+        //         console.log("FunctionDeclaration")
+        //         var node = path.node;
+        //         var params = node.params;
+        //         var body = node.body;
+        //         var async = node.async;
+        //         path.replaceWith(
+        //             t.arrowFunctionExpression(params, body, async)
+        //         );
+        //     }
+        // }
+    });
+    // }
+}
+
+function generateClassStructure(param) {
+    var mainFunctionBodyPath = param.mainFunctionBodyPath;
+    var structureInfo = collectStructureInfo(mainFunctionBodyPath);
+
+    var controllerName = param.controllerName;
+    var injectArr = param.injectArr;
+    var newAst = generateMain(controllerName, injectArr);
+
+    generateClassMethod(newAst, structureInfo);
+}
+
+function generateMain(controllerName, injectArr) {
+    //import
+    //export
+    //class
+    // console.log("begin generateMain", controllerName, injectArr)
+    injectArr = injectArr.map(function (item) {
+        return "'" + item + "'";
+    });
+    injectArr.unshift("this");
+    var injectStr = injectArr.join(", ");
+
+    var tmp = `/**
+        *
+        */
+        import { BaseView } from 'js/base.view.js';
+        import { services } from 'js/app.services.js';
+        
+        class ${controllerName} extends BaseView {
+            constructor($scope) {
+            services.inject(${injectStr});
+            }
+        }
+        
+        export { ${controllerName} };
+`;
+    var option = {
+        sourceType: "module"
+    };
+
+    var newAst = babylon.parse(tmp + "", option);
+    return newAst;
+
+
+}
+
+/**
+ * 搜集结构信息
+ * cont
+ * @param path
+ */
+function collectStructureInfo(path) {
+    var constructorInfo = [];
+    var methodBodyInfo = [];
+
+    var node = path.node;
+
+    for (var i in node.body) {
+        // traverse(bodyPath, {})
+        var bodyNode = node.body[i];
+        var bodyPath = path.get("body." + i);
+
+        // console.log("=>", bodyNode.type, getLine(bodyPath))
+        // console.log("==>", bodyPath.node == bodyNode)
+        switch (bodyNode.type) {
+            case "ExpressionStatement":
+                // console.log("==>", bodyNode.expression.right && bodyNode.expression.right.type, getLine(bodyPath));
+                var flag = false;
+                if (bodyNode.expression.type == "AssignmentExpression") {
+                    var expression = bodyNode.expression;
+                    if (expression.right && expression.right.type == "ArrowFunctionExpression") {
+
+                        //需要找到被应用位置，一起修改吧
+                        // console.log("bodyPath=>:", bodyPath.scope)
+                        // var dstNode = expression.right;
+                        // dstNode.key = {
+                        //     type: "Identifier",
+                        //     name: expression.left.property.name
+                        // };
+                        //
+                        //
+                        // var kind = "";
+                        // var key = "";
+                        // var params = "";
+                        // var body = "";
+                        // var computed = "";
+                        // var static = "";
+                        //
+                        // // t.classMethod(kind, key, params, body, computed, static)
+                        //
+                        // methodBodyInfo.push(t.classMethod(kind, key, params, body, computed, static));
+                        flag = true;
+                    }
+                }
+                if (!flag) {
+                    constructorInfo.push(bodyNode);
+                }
+                break;
+
+            case "IfStatement":
+            case "TryStatement":
+            case "ForInStatement":
+                constructorInfo.push(bodyNode);
+                break;
+
+            case "EmptyStatement":
+                break;
+            default:
+                //报错
+                console.log("collectStructureInfo", "unknown type");
+                break;
+        }
+    }
+    return {
+        constructorInfo, methodBodyInfo
+    }
+}
+function generateClassMethod(ast, param) {
+
+    var constructorInfo = param.constructorInfo;
+    var methodBodyInfo = param.methodBodyInfo;
+    if (ast) {
+
+        traverse(ast, {
+            ClassMethod: {
+                enter: function (path) {
+                    var node = path.node;
+                    if (node.key.name == "constructor") {
+                        console.log("constructorInfo", constructorInfo.length);
+                        console.log("methodBodyInfo", methodBodyInfo.length);
+                        var mainNode = node;
+                        if (!(node.body instanceof Array)) {
+                            mainNode = path.get('body');
+                        }
+
+                        // for (var i in constructorInfo) {
+                        mainNode.pushContainer('body', constructorInfo);
+                        // }
+
+                        // for (var i in methodBodyInfo) {
+                        path.insertAfter(methodBodyInfo);
+                        // path.insertChildAfter()
+                        // }
+
+                    }
+                }
+            }
+        })
+
+        var output = generate(ast);
+
+        fs.writeFile(oldDstPath, output.code, "utf8");
+        // for (var i in output) {
+        //     console.log(i);
+        //     console.log(output[i]);
+        // }
+        // console.log("after write:", output)
+    }
+
+}
+
+
+function testFun(path) {
+    var node = path.node;
+
+    var allPath = path.scope.bindings["$scope"].referencePaths;
+    var bindings = path.scope.bindings;
+    for (var i in bindings) {
+        var allPath = bindings[i].referencePaths;
+        for (var j in allPath) {
+            var dstPath = allPath[j];
+            dstPath = dstPath;
+            //找到父元素的类型非MemberExpression 为止
+            while (dstPath.parentPath.node.type == "MemberExpression" && dstPath.parentPath.key == "object") {
+                // console.log(">",dstPath.node.type)
+                dstPath = dstPath.parentPath;
+            }
+
+            var outPut = generate(dstPath.node);
+
+            // if (getLine(dstPath) == 78) {
+            console.log(outPut.code, getLine(dstPath))
+            // }
+        }
+    }
+
+    // console.log("=>",bodyPath.scope.bindings["$scope"].referencePaths)
 
 
 }
