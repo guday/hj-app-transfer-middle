@@ -15,8 +15,14 @@ app.controller('AboutController', ['$scope', 'cache',
         //多级变量申明
         var scopeData = $scope.data = {};
         var scopeData2 = scopeData;
+        //this comment
+        this.test1 = "12";//this comment1
+        this.test1 = undefined;
+        // this.test2 = function () {
+
+        // }
         //变量赋值
-        scopeData = null;
+        scopeData.ccc = function(){},scopeData2=12;
         //单个变量申明
         var singleVariable = 'singleVariable';
         //多个变量申明， 包括函数
@@ -28,6 +34,11 @@ app.controller('AboutController', ['$scope', 'cache',
             },
             mutiVar4 = scopeData,
             mutiVar5 = cache.getInfo();
+
+        if (mutiVar1) {
+            var ifVar1 = 1;
+            var ifVar2 = mutiVar2;
+        }
 
         var objVar = {
             objVar1: "objVar1",

@@ -12,23 +12,39 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   //scope变量初始化
   this.data = {}; //commment
   //多级变量申明
-  var scopeData = this.data = {};
-  var scopeData2 = this.scopeData;
-  //变量赋值
-  scopeData = null;
-  //单个变量申明
-  var singleVariable = 'singleVariable';
-  //多个变量申明， 包括函数
-  var mutiVar1,
-      mutiVar2 = null,
-      mutiVar3 = "mutiVar3",
-      mutiFun = function (param1) {
-    console.log(param1);
-  },
-      mutiVar4 = this.scopeData,
-      mutiVar5 = this.cache.getInfo();
+  this.scopeData = this.data = {};
+  this.scopeData2 = this.scopeData;
+  //this comment
 
-  var objVar = {
+  this.test1 = "12"; //this comment1
+  this.test1 = undefined;
+  // this.test2 = function () {
+
+  // }
+  //变量赋值
+  this.scopeData.ccc = function () {}, scopeData2 = 12;
+  //单个变量申明
+  this.singleVariable = 'singleVariable';
+  //多个变量申明， 包括函数
+
+  this.mutiVar1 = undefined;
+  this.mutiVar2 = null;
+  this.mutiVar3 = "mutiVar3";
+
+  this.mutiFun = function (param1) {
+    console.log(param1);
+  };
+
+  this.mutiVar4 = this.scopeData;
+  this.mutiVar5 = this.cache.getInfo();
+
+
+  if (this.mutiVar1) {
+    this.ifVar1 = 1;
+    this.ifVar2 = this.mutiVar2;
+  }
+
+  this.objVar = {
     objVar1: "objVar1",
     objVar2: this.scopeData,
     objVar3: function (param1, param2) {
@@ -49,7 +65,8 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   };
 
   //函数直接申明
-  var singleFun = function (param1) {
+
+  this.singleFun = function (param1) {
     console.log(param1);
     //对象
     var obj = {
@@ -75,6 +92,8 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   };
 
   //scope函数初始化
+
+
   this.scopeFun = function (param1) {
     console.log(param1);
   };
@@ -97,11 +116,14 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   /**
    * 表达式
    */
-  function decFun(param1, param2) {
+
+  this.decFun = function (param1, param2) {
     console.log(param1, param2);
-  }
+  };
 
   //直接调用
+
+
   this.mutiFun();
   //调用
   this.scopeFun(function (param1) {

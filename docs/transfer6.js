@@ -34,16 +34,13 @@ function mainTransfer(ast) {
 
     var newAst = null;
     var bodyVariableMap = {};
-    var mainScopeMap = {};
-    var referenceScopeNameArr = [];
-    var referenceUnRootNameArr = [];
 
     var mainFunctionBodyPath = null;
 
     var controllerName = "";
     var nodeScopeTypeMap = {
-        "mainFun":[],
-        "firstClass":[]
+        "mainFun": [],
+        "firstClass": []
     };
 
     //找到mainFunction
@@ -58,7 +55,6 @@ function mainTransfer(ast) {
                         controllerName = param.controllerName;
                         mainFunctionBodyPath = path;
                         mainFunctionBodyScopeId = path.scope.uid;
-                        // mainScopeMap = getMainBodyScope(mainFunctionBodyPath);
                         // console.log(mainFunctionBodyScope.bindings["$scope"])
                     })
                 })
@@ -118,8 +114,33 @@ function mainTransfer(ast) {
             }
         }
 
+
     }
 
+    //因为之前ast执行过替换，上下文已经乱了，所以，再来一次
+    var output = generate(ast);
+    ast = getFullAst(output.code);
+
+    //找到mainFunction
+    traverse(ast, {
+        //直接调用的表达式
+        CallExpression: {
+            enter: function (path) {
+                var node = path.node;
+                //app.controller
+                getAppController(path, function () {
+                    getMainFunctionBody(path, function (path, param) {
+                        controllerName = param.controllerName;
+                        mainFunctionBodyPath = path;
+                        mainFunctionBodyScopeId = path.scope.uid;
+                        //下面的执行一定要放在traverse中，否则查不到contexts
+                        processBodyFunction(mainFunctionBodyPath);
+                    })
+                })
+            }
+
+        }
+    });
 
     generateTest();
 
@@ -129,146 +150,7 @@ function mainTransfer(ast) {
         fs.writeFile(oldDstPath, output.code, "utf8");
     }
 
-    //1、取得一级变量列表
-    function getBodyInfoName(mainBodyArr) {
-        // bodyVariableMap
-        for (var i in mainBodyArr) {
-            var bodyNode = mainBodyArr[i];
-            // console.log("==>", bodyPath.node == bodyNode)
-            switch (bodyNode.type) {
-                case "VariableDeclaration":
-                    var headInfo = [];
-                    for (var j in bodyNode.declarations) {
-                        var itemNode = bodyNode.declarations[j];
-                        if (itemNode.init && itemNode.init.type == "FunctionExpression") {
-                            var fnName = itemNode.id.name;
-                            if (bodyVariableMap[fnName]) {
-                                reportError(10);
-                            }
-                            bodyVariableMap[fnName] = true;
-                        } else {
 
-                        }
-                    }
-
-
-                    break;
-                case "ExpressionStatement":
-                    if (bodyNode.expression.type == "AssignmentExpression") {
-                        var expression = bodyNode.expression;
-                        if (expression.right && expression.right.type == "FunctionExpression") {
-                            var fnName = getNodeName(expression.left);
-                            if (bodyVariableMap[fnName]) {
-                                reportError(11);
-                            }
-                            bodyVariableMap[fnName] = true;
-                        }
-                    }
-
-                    break;
-                case "FunctionDeclaration":
-
-                    var fnName = getNodeName(bodyNode.id);
-                    if (bodyVariableMap[fnName]) {
-                        reportError(11);
-                    }
-                    bodyVariableMap[fnName] = true;
-                    break;
-                case "IfStatement":
-                case "TryStatement":
-                case "ForInStatement":
-                    break;
-
-                case "EmptyStatement":
-                    break;
-                default:
-                    //报错
-                    break;
-            }
-        }
-    }
-
-    function generateMain(controllerName, injectArr) {
-        //import
-        //export
-        //class
-        // console.log("begin generateMain", controllerName, injectArr)
-        injectArr = injectArr.map(function (item) {
-            return "'" + item + "'";
-        });
-        injectArr.unshift("this")
-        var injectStr = injectArr.join(", ");
-
-        var tmp = `/**
-        *
-        */
-import { BaseView } from 'js/base.view.js';
-import { services } from 'js/app.services.js';
-
-class ${controllerName} extends BaseView {
-    constructor($scope) {
-    services.inject(${injectStr});
-    }
-}
-
-export { ${controllerName} };
-`;
-        var option = {
-            sourceType: "module"
-        };
-        newAst = babylon.parse(tmp + "", option)
-
-
-    }
-
-    function generateClassMethod(constructorInfo, methodBodyInfo) {
-
-        if (newAst) {
-
-            traverse(newAst, {
-                ClassMethod: {
-                    enter: function (path) {
-                        var node = path.node;
-                        if (node.key.name == "constructor") {
-                            console.log("constructorInfo", constructorInfo.length);
-                            console.log("methodBodyInfo", methodBodyInfo.length);
-                            var mainNode = node;
-                            if (!(node.body instanceof Array)) {
-                                mainNode = path.get('body');
-                            }
-
-                            // for (var i in constructorInfo) {
-                            mainNode.pushContainer('body', constructorInfo);
-                            // }
-
-                            // for (var i in methodBodyInfo) {
-                            path.insertAfter(methodBodyInfo);
-                            // path.insertChildAfter()
-                            // }
-
-                        }
-                    }
-                }
-            })
-
-            var output = generate(newAst);
-
-            fs.writeFile(oldDstPath, output.code, "utf8");
-            // for (var i in output) {
-            //     console.log(i);
-            //     console.log(output[i]);
-            // }
-            // console.log("after write:", output)
-        }
-
-    }
-}
-
-
-function parseStr(obj) {
-    var src = JSON.stringify(obj);
-    src = "var a = " + src;
-    return src;
 }
 
 
@@ -393,17 +275,6 @@ function getMainFunctionBody(path, callback) {
     })
 }
 
-function getMainBodyScope(path) {
-    var scopeMap = {};
-    var node = path.node;
-    for (var i in node.body) {
-        var dstPath = path.get('body.' + i);
-        var dstScope = dstPath.scope;
-        // console.log(dstPath.scope.uid, getLine(dstPath))
-        scopeMap[dstScope.uid] = dstScope;
-    }
-
-}
 
 function findInScope(scope, name) {
     // console.log("true", scope.uid)
@@ -467,4 +338,134 @@ function getFullAst(src, option) {
             sourceType: "module"
         }
     return babylon.parse(src + "", option)
+}
+
+
+function transformVariableDeclaration(pathArr) {
+
+
+    for (var i in pathArr) {
+        //VariableDeclaration
+        var newPathArr = [];
+        var pathVariableDeclaration = pathArr[i];
+        var nodeVariableDeclaration = pathVariableDeclaration.node;
+
+        for (var j in nodeVariableDeclaration.declarations) {
+            var pathVariableDeclarator = pathVariableDeclaration.get("declarations." + j);
+            var nodeVariableDeclarator = pathVariableDeclarator.node;
+
+            // var left = nodeVariableDeclarator.id;
+            var left = pathVariableDeclarator.get("id");
+            var right = pathVariableDeclarator.get("init");
+
+            if (!right.node) {
+                // right = t.Identifier("undefined");
+                right.replaceWith(t.Identifier("undefined"))
+            }
+
+            // console.log("==>", getLine(left));
+            left.replaceWith(t.memberExpression(t.thisExpression(), left.node, false));
+
+            //t.assignmentExpression(operator, left, right)
+            var newPathAss = t.assignmentExpression("=", left.node, right.node);
+            // //t.expressionStatement(expression)
+            var newNode = t.expressionStatement(newPathAss)
+            //
+            newPathArr.push(newNode);
+            // console.log(newNode)
+        }
+
+        pathVariableDeclaration.replaceWithMultiple(newPathArr);
+
+    }
+}
+
+
+function transformExpressionStatement(pathArr) {
+
+    for (var i in pathArr) {
+        //VariableDeclaration
+        var path = pathArr[i];
+        var node = path.node;
+        //
+
+        // var left = path.get("expression.left");
+        // console.log(node)
+        // var oldNode = left.node;
+        // left.replaceWith(t.memberExpression(t.thisExpression(), oldNode, false));
+        var params = node.params;
+        var body = node.body;
+        var generator = node.generator;
+        var async = node.async;
+        var id = node.id;
+
+
+        // t.memberExpression(object, property, computed)
+        var left = t.memberExpression(t.thisExpression(), id, false)
+        // t.functionExpression(id, params, body, generator, async)
+        var right = t.functionExpression(null, params, body, generator, async);
+
+        path.replaceWith(t.assignmentExpression("=", left, right));
+
+    }
+}
+
+/**
+ * 特殊处理， 交给检查工具去处理吧
+ * @param path
+ */
+function parseBodyStructure(path) {
+    // var node = path.node;
+    // for (var i in node.body) {
+    //     var bodyPath = path.get("body." + i);
+    //     console.log("body=>", bodyPath.node.expression.left)
+    // }
+}
+
+//对一级结果下的变量，函数申明，进行前缀替换
+function processBodyFunction(path) {
+    var variableArr = [];
+    var functionArr = [];
+    for (var i in path.scope.bindings) {
+        var aBind = path.scope.bindings[i];
+
+        // console.log(aBind.path)
+        var aPath = aBind.path;
+        var aNode = aPath.node;
+        // console.log(aNode.type, aNode.name)
+        if (aNode.type == "VariableDeclarator") {
+            //变量申明
+            var aParent = aPath.parentPath;
+            var flag = false;
+            for (var j in variableArr) {
+                if (variableArr[j] == aParent) {
+                    flag = true;
+                    break;
+                }
+            }
+            if (!flag) {
+                variableArr.push(aParent);
+            }
+            // console.log("==>", aNode.id.name, aParent)
+        } else if (aNode.type == "FunctionDeclaration") {
+            functionArr.push(aPath);
+            // console.log(aNode.type)
+        } else if (aNode.type == "Identifier") {
+            //一般是注入，可以不处理
+        } else {
+            //error
+            console.log("==>", "unknown node type")
+        }
+        //
+        // console.log(aNode.type, aNode)
+    }
+    // console.log(variableArr.length);
+    // console.log(functionArr.length);
+
+    transformVariableDeclaration(variableArr);
+    transformExpressionStatement(functionArr);
+
+    parseBodyStructure(path);
+
+
 }
