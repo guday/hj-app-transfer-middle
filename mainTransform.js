@@ -7,6 +7,7 @@ var generate = require("babel-generator").default;
 var t = require("babel-types");
 var fs = require("fs");
 var util = require("util");
+var path = require("path");
 
 var keyFunctionNameMap = {
     "controller": true
@@ -18,12 +19,14 @@ var oldDstPath2 = "./dstOld71.js";
 
 var srcFilePath = "./srcOld.js";
 var dstFilePath = "./dstOld.js";
-var isDebugFile = false;
+var debugFilePathArr = [];      //阶段性调试文件
 
 exports.default = main;
 
 function main(src, dst, debugFile) {
-    isDebugFile = debugFile;
+    if (debugFile) {
+        debugFilePathArr = getDstFilePath(dst);
+    }
     if (!src && !dst) {
         //使用默认
     } else if (src && dst) {
@@ -48,6 +51,7 @@ function mainTransfer(ast) {
     logInfo("1.序列化代码结构");
     //1、整理结构
     ast = serializeCode(ast);
+    generateTest(ast, 1);
 
     logInfo("2.代码转换");
     //2、取得一级结构信息
@@ -58,26 +62,29 @@ function mainTransfer(ast) {
 
     //4、前缀转换 (因为做过函数转换，所以重新取引用信息
     ast = processVarPrefix(ast);
+    generateTest(ast, 2);
 
     logInfo("3.新代码生成");
     //5、搜集信息，进行class转换
     ast = generateClassStructure(ast);
 
     logInfo("转换结束");
-    // generateTest(ast);
-    //
-    // function generateTest(ast) {
-    //     var output = generate(ast);
-    //
-    //     fs.writeFile(oldDstPath2, output.code, "utf8");
-    // }
 
 
 }
 
 
-function reportError(type) {
-    console.log("error:", type)
+// generateTest(ast);
+
+function generateTest(ast, index) {
+    if (debugFilePathArr.length > 0 && index && debugFilePathArr[index]) {
+        logInfo("       ", "生成过程调试文件state:" + index)
+        var filePath = debugFilePathArr[index];
+        var output = generate(ast);
+        console.log(filePath)
+        fs.writeFile(filePath, output.code, "utf8");
+    }
+
 }
 
 
@@ -295,6 +302,7 @@ function collectStructureInfo(path) {
                             }
                             if (keyArr.length > 2) {
                                 //error
+                                logError("此处不应出现大于两级的结构，一定是出了什么大问题了", strKey)
                             }
                         }
 
@@ -323,7 +331,8 @@ function collectStructureInfo(path) {
                 break;
             default:
                 //报错
-                console.log("collectStructureInfo", "unknown type");
+                logError("未知的一级结构节点类型")
+                // console.log("collectStructureInfo", "unknown type");
                 break;
         }
     }
@@ -335,6 +344,8 @@ function generateClassMethod(ast, param) {
 
     var constructorInfo = param.constructorInfo;
     var methodBodyInfo = param.methodBodyInfo;
+    logInfo("   ", "构造函数内增" + constructorInfo.length + "项")
+    logInfo("   ", "class函数新增" + methodBodyInfo.length + "项")
     if (ast) {
 
         traverse(ast, {
@@ -342,8 +353,7 @@ function generateClassMethod(ast, param) {
                 enter: function (path) {
                     var node = path.node;
                     if (node.key.name == "constructor") {
-                        console.log("constructorInfo", constructorInfo.length);
-                        console.log("methodBodyInfo", methodBodyInfo.length);
+
                         var mainNode = node;
                         if (!(node.body instanceof Array)) {
                             mainNode = path.get('body');
@@ -447,12 +457,11 @@ function getTopLevelStructureArr(ast) {
         mainFunctionBodyPath
     } = astInfo;
 
+    //作用域绑定
     topLevelVarReference = mainFunctionBodyPath.scope.bindings;
-    // console.log(topLevelVarReference)
     for (var i in topLevelVarReference) {
         topLevelVar.push(topLevelVarReference[i].path);
     }
-    // logError(topLevelVar);
 
     var mainFunctionBodyNode = mainFunctionBodyPath.node;
     for (var i in mainFunctionBodyNode.body) {
@@ -461,6 +470,10 @@ function getTopLevelStructureArr(ast) {
         topLevelModuleArr.push(bodyNode);
         // logError(bodyNode.type);
 
+        //取变量申明，或者表达式右侧
+        //如果是函数的，进行搜集
+        //已经已经序列化过，如果是函数就是arrowFunction
+        //因为已经序列化过，不用关心逗号表达式，var也只有一个项
         switch (bodyNode.type) {
             case "ExpressionStatement":
                 var dstNode = bodyNode.expression;
@@ -525,7 +538,7 @@ function serializeCode(ast) {
             var bodyPath = mainFunctionBodyPath.get("body." + i);
             var bodyNode = bodyPath.node;
             // logError(bodyNode.type, getLine(bodyPath))
-            console.log(bodyNode.type)
+            // console.log(bodyNode.type)
             switch (bodyNode.type) {
                 case "VariableDeclaration":
                     if (bodyNode.declarations.length == 0) {
@@ -549,7 +562,6 @@ function serializeCode(ast) {
                             //t.variableDeclaration(kind, declarations)
                             var newNode = t.variableDeclaration(kind, declarations);
                             newPathArr.push(newNode);
-                            // console.log(newNode)
                         }
 
                         // bodyPath.replaceWithMultiple(newPathArr);
@@ -673,6 +685,10 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
 
             var obj = {
                 fullStr, srcStr, firstStr, leftPath
+            };
+
+            if (leftFullStrMap[srcStr]) {
+                logError("源码中有重复的申明，关注关注", srcStr);
             }
             leftFullStrMap[fullStr] = obj;
             leftSrcStrMap[srcStr] = obj;
@@ -685,19 +701,12 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
     //找出需要替换的，引用位置的节点
     var referencedPathArr = [];
     for (var i in topLevelVarReference) {
-        // var aBind = topLevelVarReference[i];
-        // var aPath = aBind.path;
-        // if (i == "xx") {
-        //     console.log(aBind)
-        // }
+
         //先过滤第一个单词
         if (leftFirstStrMap[i]) {
             var aBind = topLevelVarReference[i];
             var aPath = aBind.path;
 
-            // if (i == "scopeData") {
-            //     // console.log(aBind.path)
-            // }
 
             var referencePaths = aBind.referencePaths || [];
 
@@ -736,6 +745,7 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
         }
     }
 
+    var replaceedMap = {};
 
     //进行引用替换
     // console.log(referencedPathArr.length)
@@ -748,7 +758,16 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
         var fullStr = leftMap.fullStr;
         // console.log(dstPath.node.type)
         dstPath.replaceWith(t.identifier(fullStr));
+        replaceedMap[fullStr] = leftMap;
+    }
 
+    //打印替换日志
+    for (var i in replaceedMap) {
+        logInfo("   ", "替换了:" + replaceedMap[i].srcStr, "=>", replaceedMap[i].fullStr)
+    }
+
+    if (Object.keys(replaceedMap).length != Object.keys(leftSrcStrMap).length) {
+        logError("实际替换量与理论替换数量不一致，请检查", Object.keys(replaceedMap), Object.keys(leftSrcStrMap))
     }
 
     //一级函数需要做var处理，保证格式统一
@@ -846,6 +865,7 @@ function processVarPrefix(ast) {
             //不处理
         } else {
             //error
+            logError("未知的引用类型", aNode.type)
         }
     }
 
@@ -934,4 +954,29 @@ function logInfo() {
         }
     }
     console.log("info=>:", arr.join(" "))
+}
+
+
+function getDstFilePath(srcFullPath) {
+    var fileNum = 4;
+    var srcFilePathObj = path.parse(srcFilePath);
+    var {
+        root,
+        dir,
+        ext
+    } = srcFilePathObj;
+    var srcName = srcFilePathObj.name;
+
+    var arr = [];
+    for (var i = 1; i <= 7; i++) {
+        var name = srcName + ".state" + i;
+        arr.push(path.format({
+            root,
+            dir,
+            ext,
+            name
+        }))
+    }
+    return arr;
+
 }

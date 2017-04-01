@@ -14,11 +14,13 @@ if (!srcFilePath) {
 srcFilePath = path.join(rootPath, srcFilePath);
 // }
 
+var isDebugFile = arguments[1] || false;
+
 var dstFilePath = getDstFilePath(srcFilePath);
 console.log("转换源文件", srcFilePath);
 console.log("转目的文件", dstFilePath);
 
-transfer(srcFilePath, dstFilePath, true)
+transfer(srcFilePath, dstFilePath, isDebugFile);
 
 function getDstFilePath(srcFullPath) {
     var dstFileFix = ".transfer";
