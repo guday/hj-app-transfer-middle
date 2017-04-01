@@ -739,6 +739,7 @@ function testFun(path) {
     var allPath = path.scope.bindings["$scope"].referencePaths;
     var bindings = path.scope.bindings;
     for (var i in bindings) {
+        console.log("==>",i)
         var allPath = bindings[i].referencePaths;
         for (var j in allPath) {
             var dstPath = allPath[j];

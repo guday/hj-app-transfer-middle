@@ -10,6 +10,10 @@
 app.controller('AboutController', ['$scope', 'cache',
     function ($scope, cache) {
 
+        gVar1 = "12";
+        gFun1 = function () {
+            
+        }
         //scope变量初始化
         $scope.data = {};//commment
         //多级变量申明
@@ -73,8 +77,10 @@ app.controller('AboutController', ['$scope', 'cache',
                     console.log(param1, param2);
                     mutiVar1 = 12;
                     $scope.data.newValue = mutiVar3;
-                    $scope.data["newValue"] = mutiVar3;
+                    $scope.data["newValue"] = scopeData2;
                     $scope.data[mutiVar3] = mutiVar3;
+                    $scope.data[scopeData.ccc(obj)] = mutiVar3;
+                    $scope.data[singleFun(obj)] = mutiVar3;
                     $scope.data[mutiVar3.mutiVar3Value] = mutiVar3;
                     $scope.data[$scope.funScopeVar] = mutiVar3;
                     $scope.data.newValue = "newValue";
@@ -100,6 +106,8 @@ app.controller('AboutController', ['$scope', 'cache',
         var xx =  (a,b)=> {
 
         }
+        
+
         //scope函数初始化
         $scope.scopeFun = function (param1) {
             console.log(param1)
