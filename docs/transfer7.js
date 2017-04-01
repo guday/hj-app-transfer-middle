@@ -55,9 +55,14 @@ function mainTransfer(ast) {
     //2、取得一级结构信息
     var topLevelInfo = getTopLevelStructureArr(ast);
 
-    //3、处理数据
-    processCodeWithTopLevelInfo(ast, topLevelInfo);
+    //3、函数转换
+    ast = processFunctionNameWithTopLevelInfo(ast, topLevelInfo);
 
+    //4、前缀转换 (因为做过函数转换，所以重新取引用信息
+    ast = processVarPrefix(ast);
+
+    //5、搜集信息，进行class转换
+    ast = generateClassStructure(ast);
     //
     //
     // //对所有引用进行分类
@@ -564,16 +569,6 @@ function replaceToArrowFunction(path) {
     // }
 }
 
-function generateClassStructure(param) {
-    var mainFunctionBodyPath = param.mainFunctionBodyPath;
-    var structureInfo = collectStructureInfo(mainFunctionBodyPath);
-
-    var controllerName = param.controllerName;
-    var injectArr = param.injectArr;
-    var newAst = generateMain(controllerName, injectArr);
-
-    generateClassMethod(newAst, structureInfo);
-}
 
 function generateMain(controllerName, injectArr) {
     //import
@@ -634,27 +629,42 @@ function collectStructureInfo(path) {
                 var flag = false;
                 if (bodyNode.expression.type == "AssignmentExpression") {
                     var expression = bodyNode.expression;
+                    // console.log("=>", expression.right.type, getLine(bodyPath))
                     if (expression.right && expression.right.type == "ArrowFunctionExpression") {
+                        var dstFunction = expression.right;
 
                         //需要找到被应用位置，一起修改吧
                         // console.log("bodyPath=>:", bodyPath.scope)
-                        // var dstNode = expression.right;
-                        // dstNode.key = {
-                        //     type: "Identifier",
-                        //     name: expression.left.property.name
-                        // };
+
+                        var kind = "method";
+                        var key = expression.left;
+                        var params = dstFunction.params;
+                        var body = dstFunction.body;
+                        var computed = false;
+                        var static = false;
+
+
+                        var strKey = generate(key).code;
+                        var keyArr = strKey.split('.');
+
+                        if (keyArr.length > 1) {
+                            var keyNewStr = "";
+                            if (keyArr[0] == "this"){
+                                keyNewStr = keyArr[1]
+                                key = t.identifier(keyNewStr);
+                            }
+                            if (keyArr.length > 2) {
+                                //error
+                            }
+                        }
+
                         //
-                        //
-                        // var kind = "";
-                        // var key = "";
-                        // var params = "";
-                        // var body = "";
-                        // var computed = "";
-                        // var static = "";
-                        //
-                        // // t.classMethod(kind, key, params, body, computed, static)
-                        //
-                        // methodBodyInfo.push(t.classMethod(kind, key, params, body, computed, static));
+                        // logError(key)
+                        // logError(params)
+                        // logError(body)
+                        // t.classMethod(kind, key, params, body, computed, static)
+                        methodBodyInfo.push(t.classMethod(kind, key, params, body, computed, static));
+
                         flag = true;
                     }
                 }
@@ -1014,7 +1024,12 @@ function serializeCode(ast) {
     return ast;
 }
 
-function processCodeWithTopLevelInfo(ast, topLevelInfo) {
+/**
+ * 整理函数名称转换
+ * @param ast
+ * @param topLevelInfo
+ */
+function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
     var astInfo = preprocessAst(ast);
     var {
         param,
@@ -1055,7 +1070,7 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
             leftFullStrMap[fullStr] = obj;
             leftSrcStrMap[srcStr] = obj;
             leftFirstStrMap[firstStr] = obj;
-            console.log("需要进行前缀变换的列表", srcStr, getLine(leftPath))
+            // console.log("需要进行前缀变换的列表", srcStr, getLine(leftPath))
         }
     }
 
@@ -1092,7 +1107,7 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
                     var code = outPut.code;
                     // console.log("=>", outPut.code, getLine(findPath));
                     if (leftSrcStrMap[code]) {
-                        console.log("对应引用位置", outPut.code, getLine(findPath));
+                        // console.log("对应引用位置", outPut.code, getLine(findPath));
                         dstPath = findPath;
                         leftMap = leftSrcStrMap[code];
                         return true;
@@ -1115,6 +1130,7 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
     }
 
 
+    //进行引用替换
     // console.log(referencedPathArr.length)
     for (var i in referencedPathArr) {
         var {
@@ -1123,30 +1139,12 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
         } = referencedPathArr[i];
 
         var fullStr = leftMap.fullStr;
+        // console.log(dstPath.node.type)
+        dstPath.replaceWith(t.identifier(fullStr));
 
-        var flag = false;
-        // for (var j in leftSrcStrMap) {
-        //     //一级结构，需要用var来替换，保持格式统一，方便后续转换
-        //     if (leftSrcStrMap[j].leftPath == dstPath) {
-        //         var dstParentPath = dstPath.parentPath;
-        //         var dstParentNode = dstParentPath.node;
-        //
-        //         // console.log(dstParentNode.right)
-        //         // t.variableDeclarator(id, init)
-        //         var declarations = [t.variableDeclarator(t.identifier(fullStr), dstParentNode.right)];
-        //         var newNode = t.variableDeclaration("var", declarations);
-        //         dstParentPath.replaceWith(newNode);
-        //         flag = true;
-        //     }
-        // }
-
-
-        if (!flag) {
-            // console.log(dstPath.node.type)
-            dstPath.replaceWith(t.identifier(fullStr));
-        }
     }
 
+    //一级函数需要做var处理，保证格式统一
     for (var i in mainFunctionBodyNode.body) {
         var bodyPath = mainFunctionBodyPath.get("body." + i);
         var bodyNode = bodyPath.node;
@@ -1154,7 +1152,7 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
         if (bodyNode.type == "ExpressionStatement" && bodyNode.expression && bodyNode.expression.left) {
             // logError(bodyNode.type, getLine(bodyPath));
             var leftStr = generate(bodyNode.expression.left).code;
-            console.log(leftStr);
+            // console.log(leftStr);
             if (leftFullStrMap[leftStr]) {
                 //进行replace
                 var fullStr = leftFullStrMap[leftStr].fullStr;
@@ -1166,7 +1164,108 @@ function processCodeWithTopLevelInfo(ast, topLevelInfo) {
         }
     }
 
+    return ast;
 
+}
+
+/**
+ * 处理前缀
+ * @param ast
+ * @param topLevelInfo
+ * @returns {*}
+ */
+function processVarPrefix(ast) {
+    ast = updateAstStructure(ast);
+    var topLevelInfo = getTopLevelStructureArr(ast);
+
+    var astInfo = preprocessAst(ast);
+    var {
+        param,
+        mainFunctionBodyPath
+    } = astInfo;
+    var mainFunctionBodyNode = mainFunctionBodyPath.node;
+
+    var {
+        topLevelStructureArr,       //A
+        topLevelVar,                //B
+        topLevelModuleArr,          //C
+        topLevelVarReference,       //D
+        topLevelFunctionLeftArr     //E
+    } = topLevelInfo;
+
+    //先对引用位置进行替换
+    for (var i in topLevelVarReference) {
+        var aBind = topLevelVarReference[i]
+        var referencePaths = aBind.referencePaths || [];
+        var aPath = aBind.path;
+
+        for (var j in referencePaths) {
+            var refPath = referencePaths[j];
+            var refNode = refPath.node;
+            var name = refNode.name;
+            // logError(refNode.name);
+            if (name == "$scope") {
+                refPath.replaceWith(t.identifier("this"))
+            } else {
+                var oldNode = refPath.node;
+                refPath.replaceWith(t.memberExpression(t.thisExpression(), oldNode, false))
+            }
+            // logError(referenceArr[j])
+        }
+    }
+
+    for (var i in topLevelVarReference) {
+        var aBind = topLevelVarReference[i]
+        var aPath = aBind.path;
+        var aNode = aPath.node;
+        if (aNode.type == "VariableDeclarator") {
+            var parentPath = aPath.parentPath;
+            var left = t.memberExpression(t.thisExpression(), aNode.id, false);
+            var rightPath = aPath.get("init");
+
+
+            if (!rightPath.node) {
+                // right = t.Identifier("undefined");
+                rightPath.replaceWith(t.Identifier("undefined"))
+            }
+
+            //t.assignmentExpression(operator, left, right)
+            var newPathAss = t.assignmentExpression("=", left, rightPath.node);
+            // //t.expressionStatement(expression)
+            var newNode = t.expressionStatement(newPathAss)
+            parentPath.replaceWith(newNode);
+        } else if (aNode.type == "Identifier") {
+
+            //不处理
+        } else {
+            //error
+        }
+    }
+
+    return ast;
+}
+
+
+function generateClassStructure(ast) {
+    ast = updateAstStructure(ast);
+    var topLevelInfo = getTopLevelStructureArr(ast);
+
+    var astInfo = preprocessAst(ast);
+    var {
+        param,
+        mainFunctionBodyPath
+    } = astInfo;
+    var mainFunctionBodyNode = mainFunctionBodyPath.node;
+
+    var structureInfo = collectStructureInfo(mainFunctionBodyPath);
+
+    var controllerName = param.controllerName;
+    var injectArr = param.injectArr;
+    var newAst = generateMain(controllerName, injectArr);
+
+    generateClassMethod(newAst, structureInfo);
+
+    return ast;
 }
 
 function getFullVarString(path, callback) {
