@@ -1,5 +1,5 @@
 var path = require("path");
-var transfer = require("./transferMiddler").default
+var transfer = require("./mainTransform").default
 
 var arguments = process.argv.splice(2);
 var rootPath = process.cwd();
