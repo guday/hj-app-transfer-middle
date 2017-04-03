@@ -11,11 +11,8 @@ var path = require("path");
 
 var keyFunctionNameMap = {
     "controller": true
-}
+};
 
-var oldPath = "./srcOld.js";
-var oldDstPath = "./dstOld7.js";
-var oldDstPath2 = "./dstOld71.js";
 
 var srcFilePath = "./srcOld.js";
 var dstFilePath = "./dstOld.js";
@@ -24,9 +21,7 @@ var debugFilePathArr = [];      //阶段性调试文件
 exports.default = main;
 
 function main(src, dst, debugFile) {
-    if (debugFile) {
-        debugFilePathArr = getDstFilePath(dst);
-    }
+
     if (!src && !dst) {
         //使用默认
     } else if (src && dst) {
@@ -37,6 +32,10 @@ function main(src, dst, debugFile) {
         //不处理
         console.log("参数不齐，不干活");
         return;
+    }
+
+    if (debugFile) {
+        debugFilePathArr = getDstFilePath(dst);
     }
 
     var srcContent = fs.readFileSync(srcFilePath, "utf8");
@@ -81,7 +80,7 @@ function generateTest(ast, index) {
         logInfo("       ", "生成过程调试文件state:" + index)
         var filePath = debugFilePathArr[index];
         var output = generate(ast);
-        console.log(filePath)
+        // console.log(filePath)
         fs.writeFile(filePath, output.code, "utf8");
     }
 
@@ -181,9 +180,9 @@ function replaceToArrowFunction(path) {
                 var key = node.key;
                 var kind = node.kind;
                 if (kind == "method") {
-                    path.replaceWith(
-                        t.ObjectProperty(key, t.arrowFunctionExpression(params, body, async))
-                    );
+                    var newNode = t.ObjectProperty(key, t.arrowFunctionExpression(params, body, async));
+                    setComments(newNode, node);
+                    path.replaceWith(newNode);
                 }
 
             }
@@ -195,9 +194,9 @@ function replaceToArrowFunction(path) {
                 var params = node.params;
                 var body = node.body;
                 var async = node.async;
-                path.replaceWith(
-                    t.arrowFunctionExpression(params, body, async)
-                );
+                var newNode = t.arrowFunctionExpression(params, body, async);
+                setComments(newNode, node)
+                path.replaceWith(newNode);
             }
         },
         // FunctionDeclaration: {
@@ -311,7 +310,11 @@ function collectStructureInfo(path) {
                         // logError(params)
                         // logError(body)
                         // t.classMethod(kind, key, params, body, computed, static)
-                        methodBodyInfo.push(t.classMethod(kind, key, params, body, computed, static));
+                        var newNode = t.classMethod(kind, key, params, body, computed, static);
+                        setComments(newNode, bodyNode);
+                        // console.log("==>", key.name, newNode.leadingComments[0] && newNode.leadingComments[0]);
+                        // console.log("==>", key.name, newNode.tailingComments[0] && newNode.tailingComments[0]);
+                        methodBodyInfo.push(newNode);
 
                         flag = true;
                     }
@@ -554,6 +557,7 @@ function serializeCode(ast) {
                         var newPathArr = [];
 
                         for (var i in bodyNode.declarations) {
+                            //每个var节点
                             var nodeVariableDeclarator = bodyNode.declarations[i];
 
                             var kind = bodyNode.kind;
@@ -561,14 +565,22 @@ function serializeCode(ast) {
 
                             //t.variableDeclaration(kind, declarations)
                             var newNode = t.variableDeclaration(kind, declarations);
+                            //每个子节点，设置注释
+                            setComments(newNode, nodeVariableDeclarator);
+
                             newPathArr.push(newNode);
                         }
+
+                        //第一个节点的注释，要继承原节点的注释
+                        setComments(newPathArr[0], bodyNode);
 
                         // bodyPath.replaceWithMultiple(newPathArr);
                         replaceArr.push({
                             path: bodyPath,
                             method: "replaceWithMultiple",
-                            dst: newPathArr
+                            dst: newPathArr,
+                            leadingComments: [],
+                            tailingComments: []
                         })
                     }
                     break;
@@ -582,6 +594,9 @@ function serializeCode(ast) {
                     var declarations = [t.variableDeclarator(id, t.arrowFunctionExpression(params, body, async))];
                     var newNode = t.variableDeclaration("var", declarations);
                     // bodyPath.replaceWith(newNode);
+
+                    setComments(newNode, bodyNode);
+
                     replaceArr.push({
                         path: bodyPath,
                         method: "replaceWith",
@@ -594,9 +609,11 @@ function serializeCode(ast) {
                         var newArr = []
                         var expressions = bodyNode.expression.expressions;
                         for (var i in expressions) {
-                            newArr.push(t.expressionStatement(expressions[i]));
+                            var newNode = t.expressionStatement(expressions[i]);
+                            newArr.push(newNode);
                         }
                         // bodyPath.replaceWithMultiple(newArr);
+                        setComments(newArr[0], bodyNode);
                         replaceArr.push({
                             path: bodyPath,
                             method: "replaceWithMultiple",
@@ -707,7 +724,6 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
             var aBind = topLevelVarReference[i];
             var aPath = aBind.path;
 
-
             var referencePaths = aBind.referencePaths || [];
 
             for (var j in referencePaths) {
@@ -739,9 +755,7 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
                         leftMap
                     })
                 }
-                // logError(referencePath)
             }
-            // logError(i, referencePaths.length)
         }
     }
 
@@ -775,7 +789,8 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
         var bodyPath = mainFunctionBodyPath.get("body." + i);
         var bodyNode = bodyPath.node;
 
-        if (bodyNode.type == "ExpressionStatement" && bodyNode.expression && bodyNode.expression.left) {
+        if (bodyNode.type == "ExpressionStatement" &&
+            bodyNode.expression && bodyNode.expression.left) {
             // logError(bodyNode.type, getLine(bodyPath));
             var leftStr = generate(bodyNode.expression.left).code;
             // console.log(leftStr);
@@ -785,6 +800,7 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
 
                 var declarations = [t.variableDeclarator(t.identifier(fullStr), bodyNode.expression.right)];
                 var newNode = t.variableDeclaration("var", declarations);
+                setComments(newNode, bodyNode)
                 bodyPath.replaceWith(newNode)
             }
         }
@@ -834,7 +850,9 @@ function processVarPrefix(ast) {
                 refPath.replaceWith(t.identifier("this"))
             } else {
                 var oldNode = refPath.node;
-                refPath.replaceWith(t.memberExpression(t.thisExpression(), oldNode, false))
+                var newNode = t.memberExpression(t.thisExpression(), oldNode, false);
+                // setComments(newNode, oldNode);
+                refPath.replaceWith(newNode)
             }
             // logError(referenceArr[j])
         }
@@ -858,7 +876,8 @@ function processVarPrefix(ast) {
             //t.assignmentExpression(operator, left, right)
             var newPathAss = t.assignmentExpression("=", left, rightPath.node);
             // //t.expressionStatement(expression)
-            var newNode = t.expressionStatement(newPathAss)
+            var newNode = t.expressionStatement(newPathAss);
+            setComments(newNode, aNode);
             parentPath.replaceWith(newNode);
         } else if (aNode.type == "Identifier") {
 
@@ -959,7 +978,7 @@ function logInfo() {
 
 function getDstFilePath(srcFullPath) {
     var fileNum = 4;
-    var srcFilePathObj = path.parse(srcFilePath);
+    var srcFilePathObj = path.parse(srcFullPath);
     var {
         root,
         dir,
@@ -968,15 +987,96 @@ function getDstFilePath(srcFullPath) {
     var srcName = srcFilePathObj.name;
 
     var arr = [];
-    for (var i = 1; i <= 7; i++) {
+    for (var i = 0; i < 7; i++) {
         var name = srcName + ".state" + i;
-        arr.push(path.format({
+        var newPath = path.format({
             root,
             dir,
             ext,
             name
-        }))
+        });
+        arr.push(newPath);
+        // console.log("path", newPath)
     }
     return arr;
+
+}
+
+
+function setComments(dstNode, srcNode) {
+    var dstlead = dstNode.leadingComments || [];
+    var dstTail = dstNode.tailingComments || [];
+
+    var srcLead = srcNode.leadingComments || [];
+    var srcTail = srcNode.tailingComments || [];
+
+    dstlead = serializeComments(dstlead);
+    dstTail = serializeComments(dstTail);
+
+    srcLead = serializeComments(srcLead);
+    srcTail = serializeComments(srcTail);
+
+    // var newLeadArr = [];
+    // for (var i in srcLead) {
+    //     var flag = false;
+    //     for (var j in dstlead) {
+    //         if (isSameComment(srcLead[i], dstlead[j])) {
+    //             flag = true;
+    //             break;
+    //         }
+    //     }
+    //     if (!flag) {
+    //         newLeadArr.push(srcLead[i])
+    //     }
+    // }
+    //
+    // var newTailArr = [];
+    // for (var i in srcTail) {
+    //     var flag = false;
+    //     for (var j in dstTail) {
+    //         if (isSameComment(srcTail[i], dstTail[j])) {
+    //             flag = true;
+    //             break;
+    //         }
+    //     }
+    //     if (!flag) {
+    //         newTailArr.push(srcTail[i]);
+    //     }
+    // }
+
+    dstlead = dstlead.concat(srcLead);
+    dstTail = dstTail.concat(srcTail);
+
+    dstNode.leadingComments = dstlead;
+    dstNode.tailingComments = dstTail;
+}
+
+function serializeComments(comment) {
+    return comment || []
+    // var arr = [];
+    // for (var i in comment) {
+    //     var {
+    //         type, value, loc, start, end
+    //     } = comment[i];
+    //     arr.push({
+    //         type, value, loc, start, end
+    //     })
+    // }
+    // arr = deDuplicateComment(arr);
+    // return arr;
+}
+
+function isSameComment(a, b) {
+    return a.type == b.type && a.value == b.value;
+}
+
+function deDuplicateComment(arr) {
+    var newArr = [];
+    for (var i in arr) {
+        if (arr.indexOf(arr[i]) == i) {
+            newArr.push(arr[i]);
+        }
+    }
+    return newArr;
 
 }

@@ -26,11 +26,14 @@ app.controller('AboutController', ['$scope', 'cache',
 
         // }
         //变量赋值
-        scopeData.ccc = function(){},scopeData2=12;
+        scopeData.ccc = function(){},
+            //scopeData2comment
+            scopeData2=12;
         //单个变量申明
         var singleVariable = 'singleVariable';
         //多个变量申明， 包括函数
         var mutiVar1,
+            //mutiVar1 Comments
             mutiVar2 = null,
             mutiVar3 = "mutiVar3",
             mutiFun = function (param1) {
@@ -47,10 +50,12 @@ app.controller('AboutController', ['$scope', 'cache',
         var objVar = {
             objVar1: "objVar1",
             objVar2: scopeData,
+            //objVar3 comment
             objVar3: function (param1, param2) {
                 param1 = mutiVar1;
                 param2 = $scope.data;
             },
+            //obj4 comment
             objVar4(param1, param2){
                 param1 = mutiVar1;
                 param2 = $scope.data;

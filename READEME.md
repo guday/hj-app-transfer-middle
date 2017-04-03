@@ -7,3 +7,9 @@ npm install hj-app-transfer-middle
 * node dst.js arg1 arg2
 * arg1: 转码源路径
 * arg2: 是否开启中间过程调试
+
+
+
+
+##本地调试
+* node index.js ./docs/dstOld1.js true

@@ -27,6 +27,9 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
 
   this.scopeDataccc = () => {};
 
+  //scopeData2comment
+
+
   scopeData2 = 12;
   //单个变量申明
 
@@ -34,6 +37,9 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   //多个变量申明， 包括函数
 
   this.mutiVar1 = undefined;
+
+  //mutiVar1 Comments
+
   this.mutiVar2 = null;
   this.mutiVar3 = "mutiVar3";
 
@@ -53,10 +59,12 @@ app.controller('AboutController', ['$scope', 'cache', function ($scope, cache) {
   this.objVar = {
     objVar1: "objVar1",
     objVar2: this.scopeData,
+    //objVar3 comment
     objVar3: (param1, param2) => {
       param1 = this.mutiVar1;
       param2 = this.data;
     },
+    //obj4 comment
     objVar4: (param1, param2) => {
       param1 = this.mutiVar1;
       param2 = this.data;
