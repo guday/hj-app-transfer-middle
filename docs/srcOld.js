@@ -59,6 +59,7 @@ app.controller('AboutController', ['$scope', 'cache',
             objVar4(param1, param2){
                 param1 = mutiVar1;
                 param2 = $scope.data;
+
                 return mutiVar2;
             },
             get value() {

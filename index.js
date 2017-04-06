@@ -24,7 +24,7 @@ transfer(srcFilePath, dstFilePath, isDebugFile);
 
 function getDstFilePath(srcFullPath) {
     var dstFileFix = ".transfer";
-    var srcFilePathObj = path.parse(srcFilePath);
+    var srcFilePathObj = path.parse(srcFullPath);
     var {
         root,
         dir,
