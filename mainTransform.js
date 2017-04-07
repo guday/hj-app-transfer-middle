@@ -20,18 +20,20 @@ var debugFilePathArr = [];      //阶段性调试文件
 
 exports.default = main;
 
-function main(src, dst, debugFile) {
+function main(src, dst, param) {
 
-    if (!src && !dst) {
-        //使用默认
-    } else if (src && dst) {
-        //使用配置
-        srcFilePath = src;
-        dstFilePath = dst;
-    } else {
+    var {
+        debugFile,
+        callback
+    } = param;
+
+    if (!src) {
         //不处理
         console.log("参数不齐，不干活");
         return;
+    } else {
+        srcFilePath = src;
+        dstFilePath = dst;
     }
 
     if (debugFile) {
@@ -40,12 +42,17 @@ function main(src, dst, debugFile) {
 
     var srcContent = fs.readFileSync(srcFilePath, "utf8");
     var ast = getFullAst(srcContent);
-    mainTransfer(ast);
+    mainTransfer(ast, callback);
 
 }
 
-function mainTransfer(ast) {
+function mainTransfer(ast, callback) {
+    callback = callback || function () {
 
+        };
+    var callbackParam = null;
+
+    console.log("")
     logInfo("开始转换");
     logInfo("1.序列化代码结构");
     //1、整理结构
@@ -54,10 +61,15 @@ function mainTransfer(ast) {
 
     logInfo("2.代码转换");
     //2、取得一级结构信息
-    var topLevelInfo = getTopLevelStructureArr(ast);
+    var topLevelInfo = getTopLevelStructureArr(ast, function (scopeNode) {
+        // console.log(scopeNode)
+        getScopeNodeStemNames(scopeNode)
+    });
 
     //3、函数转换
-    ast = processFunctionNameWithTopLevelInfo(ast, topLevelInfo);
+    ast = processFunctionNameWithTopLevelInfo(ast, topLevelInfo, function (param) {
+        callbackParam = param;
+    });
 
     //4、前缀转换 (因为做过函数转换，所以重新取引用信息
     ast = processVarPrefix(ast);
@@ -68,6 +80,10 @@ function mainTransfer(ast) {
     ast = generateClassStructure(ast);
 
     logInfo("转换结束");
+    console.log("")
+    if (callbackParam) {
+        callback(callbackParam);
+    }
 
 
 }
@@ -447,12 +463,12 @@ function logError() {
 // var topLevelVarReferenceArr = [];   //D
 // var topLevelFunctionLeftArr = [];   //E
 
-function getTopLevelStructureArr(ast) {
-    var topLevelStructureArr = [];      //A
-    var topLevelVar = [];                //B
-    var topLevelModuleArr = [];          //C
-    var topLevelVarReference = {};      //D
-    var topLevelFunctionLeftArr = [];   //E
+function getTopLevelStructureArr(ast, callback) {
+    var topLevelStructureArr = [];          //A
+    var topLevelVar = [];                   //B 一级结构下变量值列表
+    var topLevelModuleArr = [];             //C 一级结构内容
+    var topLevelVarReference = {};          //D 一级结构下变量信息内容
+    var topLevelFunctionLeftArr = [];       //E 一级结构下，函数的左侧变量
 
     var astInfo = preprocessAst(ast);
     var {
@@ -464,6 +480,11 @@ function getTopLevelStructureArr(ast) {
     topLevelVarReference = mainFunctionBodyPath.scope.bindings;
     for (var i in topLevelVarReference) {
         topLevelVar.push(topLevelVarReference[i].path);
+    }
+
+    if (callback) {
+        //
+        callback(topLevelVarReference["$scope"])
     }
 
     var mainFunctionBodyNode = mainFunctionBodyPath.node;
@@ -665,7 +686,10 @@ function serializeCode(ast) {
  * @param ast
  * @param topLevelInfo
  */
-function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
+function processFunctionNameWithTopLevelInfo(ast, topLevelInfo, callback) {
+    callback = callback || function () {
+
+        }
     var astInfo = preprocessAst(ast);
     var {
         param,
@@ -775,10 +799,17 @@ function processFunctionNameWithTopLevelInfo(ast, topLevelInfo) {
         replaceedMap[fullStr] = leftMap;
     }
 
+    var callbackReplaceedMap = {};
     //打印替换日志
     for (var i in replaceedMap) {
-        logInfo("   ", "替换了:" + replaceedMap[i].srcStr, "=>", replaceedMap[i].fullStr)
+        logInfo("   ", "替换了:" + replaceedMap[i].srcStr, "=>", replaceedMap[i].fullStr);
+        callbackReplaceedMap[replaceedMap[i].srcStr] = replaceedMap[i].fullStr;
     }
+
+    //回调
+    callback({
+        replacedMap: callbackReplaceedMap
+    });
 
     if (Object.keys(replaceedMap).length != Object.keys(leftSrcStrMap).length) {
         logError("实际替换量与理论替换数量不一致，请检查", Object.keys(replaceedMap), Object.keys(leftSrcStrMap))
@@ -1079,4 +1110,27 @@ function deDuplicateComment(arr) {
     }
     return newArr;
 
+}
+
+function getScopeNodeStemNames(scopeNode) {
+    var referencePaths = scopeNode.referencePaths;
+
+    var scopeNameMap = {};
+    for (var i in referencePaths) {
+        var path = referencePaths[i];
+        var node = path.node;
+        getFullVarString(path, function (findPath) {
+            var outPut = generate(findPath.node);
+            var code = outPut.code;
+
+            if (!scopeNameMap[code]) {
+                scopeNameMap[code] = true;
+            }
+            // console.log(code);
+            return false;
+        })
+        // console.log(node.type, node.name)
+
+    }
+    logInfo(scopeNameMap)
 }

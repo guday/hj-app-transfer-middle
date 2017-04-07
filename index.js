@@ -1,26 +1,16 @@
 var path = require("path");
-var transfer = require("./mainTransform").default
+var transfer = require("./mainTransform").default;
 
-var arguments = process.argv.splice(2);
-var rootPath = process.cwd();
+function main(srcFilePath, param) {
 
-var srcFilePath = arguments[0] || null;
-if (!srcFilePath) {
-    logInfo("第一个参数是转码相对路径，请确保填写了")
+
+
+
+
+    var dstFilePath = getDstFilePath(srcFilePath);
+    transfer(srcFilePath, dstFilePath, param);
 }
-// if (srcFilePath.indexOf("www/js") == -1) {
-//     srcFilePath = path.join(rootPath, "www/js", srcFilePath);
-// } else {
-srcFilePath = path.join(rootPath, srcFilePath);
-// }
 
-var isDebugFile = arguments[1] || false;
-
-var dstFilePath = getDstFilePath(srcFilePath);
-console.log("转换源文件", srcFilePath);
-console.log("转目的文件", dstFilePath);
-
-transfer(srcFilePath, dstFilePath, isDebugFile);
 
 function getDstFilePath(srcFullPath) {
     var dstFileFix = ".transfer";
@@ -39,3 +29,20 @@ function getDstFilePath(srcFullPath) {
         name
     })
 }
+
+
+function logInfo() {
+    var arg = arguments;
+    var arr = [];
+    for (var i in arg) {
+        if (typeof (arg[i]) == "object") {
+            arr.push(util.inspect(arg[i]));
+        } else {
+            arr.push(arg[i])
+        }
+    }
+    console.log("info=>:", arr.join(" "))
+}
+
+
+exports.default = main;
